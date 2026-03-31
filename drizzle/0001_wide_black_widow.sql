@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "uq_users_platform" ON "users" USING btree ("platform_id","platform");

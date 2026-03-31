@@ -1,0 +1,1 @@
+ALTER TABLE "semantic_memories" ALTER COLUMN "embedding" SET DATA TYPE vector(1536);

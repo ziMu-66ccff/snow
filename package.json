@@ -1,0 +1,32 @@
+{
+  "name": "snow",
+  "private": true,
+  "description": "Snow — AI 情感陪伴助手",
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:seed": "tsx packages/core/scripts/seed.ts",
+    "script:test-db": "tsx packages/core/scripts/test-db.ts",
+    "script:chat": "tsx packages/core/scripts/chat.ts",
+    "script:test-chat": "tsx packages/core/scripts/test-chat.ts",
+    "script:test-memory-write": "tsx packages/core/scripts/test-memory-write.ts",
+    "script:test-memory-retrieval": "tsx packages/core/scripts/test-memory-retrieval.ts"
+  },
+  "devDependencies": {
+    "dotenv": "^16.4.0",
+    "drizzle-kit": "^0.31.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "@types/node": "^22.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}

@@ -1,0 +1,38 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# env files (CRITICAL: never commit real secrets)
+.env
+.env.local
+.env.production
+.env.*.local
+
+# next.js
+.next/
+out/
+
+# build
+build/
+dist/
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# misc
+.DS_Store
+*.tgz
+*.pem
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# drizzle
+drizzle/meta/
