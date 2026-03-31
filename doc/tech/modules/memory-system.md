@@ -281,6 +281,47 @@ Snow: 好呀~你不是最喜欢火锅嘛
 - extractor 知道"面试"是腾讯面试、"小美"是女朋友（有上下文）
 - 但不会重复提取"名字叫张三"（只从新对话中提取）
 
+### 未提取消息缓冲区
+
+使用独立的 `unextractedBuffer` 而非 history 下标来追踪"哪些消息还没提取"：
+
+```
+每轮对话后：
+  history.push(user, assistant)          ← 给 LLM 对话用
+  unextractedBuffer.push(user, assistant) ← 给记忆提取用
+
+增量提取时：
+  从 unextractedBuffer 取内容 → LLM 提取 → 写入 DB
+  清空 unextractedBuffer
+
+退出/超时时：
+  if (unextractedBuffer.length > 0) → 兜底提取
+```
+
+**为什么不用 history 下标？** history 可能被滑动窗口插入 system 摘要，下标会错位。独立 buffer 不受影响。
+
+### 上下文摘要压缩
+
+每次增量提取后，需要更新"之前已提取部分的摘要"作为下次提取的上下文：
+
+```
+extractedContextSummary = compressContextSummary(旧摘要, 本次新对话)
+
+拼接后 <= 1500 字？ → 直接用
+拼接后 > 1500 字？  → LLM 压缩为 200 字要点
+```
+
+### 对话摘要生成
+
+会话结束时生成的对话摘要（写入 conversations 表）不使用全量 history，而是：
+
+```
+摘要输入 = extractedContextSummary（已提取部分的压缩摘要）
+         + unextractedBuffer（最后几轮未提取的原文）
+```
+
+这样无论对话多长，输入给 LLM 的文本量都可控。
+
 ### 提取内容
 
 一次 LLM 调用，同时提取事实和印象：

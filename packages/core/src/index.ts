@@ -23,4 +23,5 @@ export { memoryVividness } from './memory/vividness.js';
 export { generateSummary, generateAndSaveConversationSummary, compressContextSummary } from './memory/summarizer.js';
 
 // Session
+export { ChatSession, type ChatSessionConfig } from './session/chat-session.js';
 export { SessionTimeoutManager, type SessionTimeoutOptions } from './session/timeout.js';
