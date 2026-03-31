@@ -4,7 +4,7 @@
 import { config } from 'dotenv';
 config({ path: '.env.local' });
 
-import { chat } from '../src/ai/chat.js';
+import { getChatResponse } from '../src/ai/chat.js';
 import { getDeepSeekChat } from '../src/ai/models.js';
 import { writeMemories } from '../src/memory/writer.js';
 import { retrieveMemories } from '../src/memory/retriever.js';
@@ -64,7 +64,7 @@ Snow: 你一定可以的，记得多喝水放松一下`;
 
     console.log('\n💬 Snow 带着记忆回复：\n');
     process.stdout.write('Snow: ');
-    const result = await chat({
+    const result = await getChatResponse({
       model: chatModel,
       userId: user.id,
       userName: user.name ?? 'test',

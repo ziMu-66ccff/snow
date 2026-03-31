@@ -5,7 +5,7 @@ import { config } from 'dotenv';
 config({ path: '.env.local' });
 
 import { eq } from 'drizzle-orm';
-import { chat } from '../src/ai/chat.js';
+import { getChatResponse } from '../src/ai/chat.js';
 import { getDeepSeekChat } from '../src/ai/models.js';
 import { db } from '../src/db/client.js';
 import { users, userRelations } from '../src/db/schema.js';
@@ -30,8 +30,8 @@ async function loadUserIdentity(platformId: string) {
   };
 }
 
-async function streamChat(params: Parameters<typeof chat>[0]): Promise<string> {
-  const result = await chat(params);
+async function streamChat(params: Parameters<typeof getChatResponse>[0]): Promise<string> {
+  const result = await getChatResponse(params);
   let full = '';
   for await (const chunk of result.textStream) {
     process.stdout.write(chunk);

@@ -19,17 +19,19 @@ export interface ChatInput {
   dynamicMemories?: string;
 }
 
-export interface ChatResult {
+export interface ChatResponse {
   textStream: AsyncIterable<string>;
   fullText: PromiseLike<string>;
 }
 
 /**
- * 核心对话函数
+ * 调用 LLM 生成 Snow 的回复（无状态）
+ *
+ * 组装 Prompt → 滑动窗口裁剪 history → 调用 LLM → 返回流式输出
  * 对话模型从外部注入（未来支持动态路由）
  * 滑动窗口/摘要等内部工具使用固定模型
  */
-export async function chat(input: ChatInput): Promise<ChatResult> {
+export async function getChatResponse(input: ChatInput): Promise<ChatResponse> {
   const ctx: PromptComposerContext = {
     userId: input.userId,
     userName: input.userName,
@@ -45,7 +47,7 @@ export async function chat(input: ChatInput): Promise<ChatResult> {
 
   const systemPrompt = composeSystemPrompt(ctx);
 
-  // 滑动窗口：超过 10 轮时，早期对话压缩为摘要
+  // 滑动窗口：对话历史超过 8K token 时，早期对话压缩为摘要
   const trimmedHistory = await applySlidingWindow(input.history ?? []);
 
   const messages: ModelMessage[] = [
