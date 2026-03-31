@@ -1,5 +1,5 @@
 import type { ModelMessage, LanguageModel } from 'ai';
-import { chat, type ChatResult } from '../ai/chat.js';
+import { chat } from '../ai/chat.js';
 import { writeMemories, type WriteMemoriesResult } from '../memory/writer.js';
 import { retrieveMemories } from '../memory/retriever.js';
 import { generateAndSaveConversationSummary, compressContextSummary } from '../memory/summarizer.js';
@@ -12,8 +12,11 @@ function formatMessages(messages: ModelMessage[]): string {
     .join('\n');
 }
 
-/** 每 N 轮增量提取一次记忆 */
+/** 默认每 N 轮增量提取一次记忆 */
 const DEFAULT_EXTRACT_INTERVAL = 5;
+
+/** 默认超时时间：30 分钟没收到新消息 → 触发一次记忆提取 */
+const DEFAULT_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 
 export interface ChatSessionConfig {
   userId: string;
@@ -24,13 +27,8 @@ export interface ChatSessionConfig {
   intimacyScore: number;
   /** 每隔多少轮提取一次记忆，默认 5 */
   extractInterval?: number;
-}
-
-export interface OnMessageResult {
-  /** Snow 的流式回复 */
-  stream: ChatResult;
-  /** 本轮是否触发了增量记忆提取 */
-  extracted: boolean;
+  /** 空闲多久触发一次记忆提取（毫秒），默认 30 分钟 */
+  idleTimeoutMs?: number;
 }
 
 /**
@@ -39,10 +37,10 @@ export interface OnMessageResult {
  * 封装一次会话的完整状态和行为：
  * - 对话历史管理
  * - 记忆检索 + 注入
- * - 增量记忆提取
- * - 会话结束（兜底提取 + 摘要生成）
+ * - 增量记忆提取（每 N 轮 + 空闲超时自动触发）
  *
- * 所有平台壳（CLI / Web / QQ / 微信）共用这一个类
+ * 外界只需要调 send()，其余全自动。
+ * 所有平台壳（CLI / Web / QQ / 微信）共用这一个类。
  */
 export class ChatSession {
   /** 全量对话历史（传给 LLM） */
@@ -60,8 +58,8 @@ export class ChatSession {
   /** 会话开始时间 */
   private startedAt = new Date();
 
-  /** 是否已关闭（防止重复关闭） */
-  private closed = false;
+  /** 空闲超时计时器（超时 → 自动提取记忆 + 生成摘要） */
+  private idleTimer: ReturnType<typeof setTimeout> | null = null;
 
   private readonly config: Required<ChatSessionConfig>;
 
@@ -69,21 +67,29 @@ export class ChatSession {
     this.config = {
       ...config,
       extractInterval: config.extractInterval ?? DEFAULT_EXTRACT_INTERVAL,
+      idleTimeoutMs: config.idleTimeoutMs ?? DEFAULT_IDLE_TIMEOUT_MS,
     };
   }
 
   /**
-   * 处理一条用户消息
+   * 发送一条消息给 Snow
    *
-   * 1. 检索记忆
-   * 2. 组装 Prompt + 调用 LLM
-   * 3. 记录到 history 和 buffer
-   * 4. 达到 N 轮时增量提取记忆
+   * 内部自动完成：
+   * 1. 重置空闲计时器
+   * 2. 检索记忆
+   * 3. 调用 LLM 生成流式回复
+   * 4. 消费完流后自动记录 history + buffer
+   * 5. 达到 N 轮时自动增量提取记忆
    *
-   * 返回流式回复，调用方负责消费 stream 并回传 fullText
+   * 外界只需要消费返回的 textStream，不需要做任何其他事。
    */
-  async onMessage(message: string): Promise<ChatResult> {
+  async send(message: string): Promise<{
+    textStream: AsyncIterable<string>;
+  }> {
     const { userId, userName, chatModel, relationRole, relationStage, intimacyScore } = this.config;
+
+    // 重置空闲计时器
+    this.resetIdleTimer();
 
     // 检索记忆
     const memories = await retrieveMemories(userId, message, { intimacyScore });
@@ -102,34 +108,46 @@ export class ChatSession {
       dynamicMemories: memories.dynamicMemories,
     });
 
-    return result;
+    // 包装 textStream：消费完毕后自动记录 + 可能触发提取
+    const self = this;
+    const wrappedStream = (async function* () {
+      let fullResponse = '';
+      for await (const chunk of result.textStream) {
+        fullResponse += chunk;
+        yield chunk;
+      }
+      // 流消费完毕，自动记录本轮对话
+      await self.recordRound(message, fullResponse);
+    })();
+
+    return { textStream: wrappedStream };
   }
 
   /**
-   * 记录一轮完成的对话（用户消息 + Snow 回复）
-   * 调用方在消费完 stream 拿到 fullText 后调用
+   * 记录一轮完成的对话 + 可能触发增量提取
+   * 由 send() 内部自动调用，外界不需要感知
    */
-  async recordRound(userMessage: string, assistantResponse: string): Promise<WriteMemoriesResult | null> {
+  private async recordRound(userMessage: string, assistantResponse: string): Promise<void> {
     const userMsg: ModelMessage = { role: 'user', content: userMessage };
     const assistantMsg: ModelMessage = { role: 'assistant', content: assistantResponse };
 
-    // 维护对话历史 + 未提取缓冲区
     this.history.push(userMsg, assistantMsg);
     this.unextractedBuffer.push(userMsg, assistantMsg);
     this.roundsSinceLastExtract++;
 
     // 达到 N 轮时增量提取记忆
     if (this.roundsSinceLastExtract >= this.config.extractInterval) {
-      return this.extractMemories();
+      await this.extractMemories();
     }
-
-    return null;
   }
 
   /**
-   * 增量提取记忆（从 buffer 中取 → 写 DB → 清空 buffer → 更新上下文摘要）
+   * 增量提取记忆 + 生成摘要
+   * 两种触发方式：
+   * 1. 每 N 轮自动触发（recordRound 里）
+   * 2. 空闲超时自动触发（idleTimer）
    */
-  async extractMemories(): Promise<WriteMemoriesResult | null> {
+  private async extractMemories(): Promise<WriteMemoriesResult | null> {
     if (this.unextractedBuffer.length === 0) return null;
 
     const newMessagesText = formatMessages(this.unextractedBuffer);
@@ -154,24 +172,59 @@ export class ChatSession {
   }
 
   /**
-   * 关闭会话（提取剩余记忆 + 生成对话摘要）
-   * 有锁保护，重复调用安全
+   * 空闲超时处理
+   * 超时不是"会话结束"，只是"好久没消息了，把 buffer 里的记忆先存了"
    */
-  async close(): Promise<string | null> {
-    if (this.closed) return null;
-    this.closed = true;
+  private async onIdleTimeout(): Promise<void> {
+    if (this.unextractedBuffer.length > 0) {
+      await this.extractMemories();
+    }
+    // 同时生成一次对话摘要，记录到目前为止的对话
+    if (this.history.length > 0) {
+      try {
+        await generateAndSaveConversationSummary({
+          userId: this.config.userId,
+          conversationMessages: this.extractedContextSummary || formatMessages(this.history),
+          startedAt: this.startedAt,
+        });
+      } catch {
+        // 摘要保存失败不影响主流程
+      }
+      // 重置开始时间，下次摘要从这里算
+      this.startedAt = new Date();
+    }
+  }
+
+  /** 重置空闲计时器（每次收到消息时调用） */
+  private resetIdleTimer(): void {
+    if (this.idleTimer) clearTimeout(this.idleTimer);
+    this.idleTimer = setTimeout(() => {
+      this.onIdleTimeout();
+    }, this.config.idleTimeoutMs);
+  }
+
+  /**
+   * 外界主动通知善后（如 CLI 退出前）
+   * 不是"关闭会话"，是"我要走了，你把剩下的记忆存一下"
+   */
+  async flush(): Promise<string | null> {
+    // 停止空闲计时器
+    if (this.idleTimer) {
+      clearTimeout(this.idleTimer);
+      this.idleTimer = null;
+    }
+
     if (this.history.length === 0) return null;
 
-    // 先保存未提取消息的快照（因为 extractMemories 会清空 buffer）
+    // 保存 buffer 快照（extractMemories 会清空 buffer）
     const remainingText = formatMessages(this.unextractedBuffer);
 
-    // 兜底提取剩余记忆
+    // 提取剩余记忆
     if (this.unextractedBuffer.length > 0) {
       await this.extractMemories();
     }
 
     // 生成对话摘要
-    // 用"已提取部分的压缩摘要 + 最后未提取的原文"，不用全量 history（token 可控）
     const conversationForSummary = this.extractedContextSummary
       ? `[之前的对话的摘要]\n${this.extractedContextSummary}\n\n[最近的对话]\n${remainingText}`
       : remainingText;
@@ -188,10 +241,5 @@ export class ChatSession {
   /** 获取当前对话轮次数 */
   get rounds(): number {
     return Math.floor(this.history.length / 2);
-  }
-
-  /** 会话是否已关闭 */
-  get isClosed(): boolean {
-    return this.closed;
   }
 }
