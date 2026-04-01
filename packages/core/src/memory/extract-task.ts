@@ -19,6 +19,7 @@ import {
   setMemoryContextSummary,
 } from '../db/queries/redis-store.js';
 import { insertConversation } from '../db/queries/memory-read.js';
+import { gcUserMemories } from './gc.js';
 
 /** 用户标识：PG 查询需要 userId，Redis 查询需要 platform + platformId */
 export interface UserIdentifier {
