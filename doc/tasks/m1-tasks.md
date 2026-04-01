@@ -252,7 +252,7 @@ Snow 对不同用户态度不同，对 zimu 最亲密。
 5. chat 脚本退出时调用关系更新
 6. **关系更新后清 Redis 身份缓存**（`snow:user:identity:{platform}:{platformId}`）
    - 亲密度/阶段变更后，缓存里的旧值会导致 Snow 态度不变
-   - 在关系更新成功后调用 `clearAllRedisKeys` 或只清 identity key
+   - 只清 identity key，不清其他 key（unextracted/summary 等和关系无关）
 
 ### 验证
 ```bash
