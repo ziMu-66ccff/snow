@@ -25,10 +25,8 @@ import {
   setCachedUserIdentity,
   pushUnextractedMessages,
   getUnextractedLength,
-  getMemoryContextSummary,
   type CachedUserIdentity,
 } from '../db/queries/redis-store.js';
-import { getLastConversationSummary } from '../db/queries/memory-read.js';
 
 /** 每 N 条消息增量提取一次记忆（5 轮 = 10 条） */
 const EXTRACT_EVERY_N_MESSAGES = 10;
@@ -90,26 +88,6 @@ async function resolveUserIdentity(platform: string, platformId: string): Promis
 }
 
 /**
- * 获取上次会话上下文（新会话时注入 Prompt）
- *
- * 优先级：
- * 1. Redis 热数据（context_summary）
- * 2. PG 冷数据（conversations 表的摘要，延时任务已持久化，内容一致只是存储位置不同）
- * 3. 都没有 = 新用户
- */
-async function getLastSessionContext(
-  platform: string, platformId: string, userId: string,
-): Promise<string | undefined> {
-  // 优先 Redis（热数据）
-  const summary = await getMemoryContextSummary(platform, platformId);
-  if (summary) return summary;
-
-  // 其次 PG（冷数据）
-  const lastConvo = await getLastConversationSummary(userId);
-  return lastConvo?.summary ?? undefined;
-}
-
-/**
  * Snow 核心对话函数
  *
  * 外界只需要传 platformId + platform + messages，其余全自动。
@@ -129,9 +107,6 @@ export async function getChatResponse(input: ChatInput): Promise<ReturnType<type
   // 判断新会话：只数 user 消息，排除 system/tool 等
   const userMessageCount = messages.filter(m => m.role === 'user').length;
   const isNewSession = userMessageCount === 1;
-  const lastSessionContext = isNewSession
-    ? await getLastSessionContext(platform, platformId, userId)
-    : undefined;
 
   // 滑动窗口处理（基于 Redis）
   const processedMessages = await applySlidingWindow(platform, platformId, messages);
@@ -142,8 +117,11 @@ export async function getChatResponse(input: ChatInput): Promise<ReturnType<type
     ? messageToText(lastUserMessage)
     : '';
 
-  // 检索记忆
-  const memories = await retrieveMemories(userId, currentMessageText, { intimacyScore });
+  // 检索记忆（retriever 内部根据 isNewSession 决定上次摘要的取法）
+  const memories = await retrieveMemories(
+    userId, currentMessageText, { intimacyScore },
+    isNewSession, platform, platformId,
+  );
 
   // 组装 Prompt
   const systemPrompt = composeSystemPrompt({
@@ -152,7 +130,7 @@ export async function getChatResponse(input: ChatInput): Promise<ReturnType<type
     relationRole: role,
     relationStage: stage,
     basicFacts: memories.basicFacts,
-    lastConversationSummary: lastSessionContext ?? memories.lastConversationSummary,
+    lastConversationSummary: memories.lastConversationSummary,
     dynamicMemories: memories.dynamicMemories,
   });
 

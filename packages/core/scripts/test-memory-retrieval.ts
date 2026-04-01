@@ -56,6 +56,7 @@ Snow: 你一定可以的，记得多喝水放松一下`;
 
     const memories = await retrieveMemories(
       user.id, message, { intimacyScore: relation.intimacyScore },
+      true, platform, platformId,
     );
 
     console.log('📦 检索到的记忆：');

@@ -15,34 +15,38 @@ import type { ModelMessage } from 'ai';
 /**
  * 从 message content 中提取可读文本
  *
- * 不同 part 类型的处理：
+ * 不同 part 类型的处理策略：
  * - TextPart:       提取 text（核心文本内容）
  * - ReasoningPart:  提取 text（推理内容，有价值）
- * - ImagePart:      [图片] 占位
- * - FilePart:       [文件] 占位
- * - ToolCallPart:   [调用工具: toolName] 记录行为
- * - ToolResultPart: [工具结果: toolName] 记录返回
+ * - ImagePart:      [图片] 占位 — TODO: 后续支持图片理解时详细处理
+ * - FilePart:       [文件] 占位 — TODO: 后续支持文件处理时详细处理
+ * - ToolCallPart:   简要描述 — TODO: 后续 MCP/tool 调用时详细处理
+ * - ToolResultPart: 简要描述 — TODO: 后续 MCP/tool 调用时详细处理
  * - 未知类型:       忽略
  */
-function contentToText(content: unknown): string {
+function contentToText(content: ModelMessage['content']): string {
   if (typeof content === 'string') return content;
 
   if (Array.isArray(content)) {
     return content
-      .map((part: any) => {
+      .map((part: Record<string, any>) => {
         switch (part.type) {
           case 'text':
             return part.text ?? '';
           case 'reasoning':
             return part.text ?? '';
+          // TODO: 后续支持图片理解时，提取图片描述或 alt text
           case 'image':
             return '[图片]';
+          // TODO: 后续支持文件处理时，提取文件摘要
           case 'file':
             return `[文件${part.filename ? ': ' + part.filename : ''}]`;
+          // TODO: 后续 MCP/tool 调用时，记录调用参数摘要
           case 'tool-call':
             return `[调用工具: ${part.toolName ?? 'unknown'}]`;
+          // TODO: 后续 MCP/tool 调用时，记录关键返回内容
           case 'tool-result':
-            return `[工具结果: ${part.toolName ?? 'unknown'}]`;
+            return `[工具 ${part.toolName ?? 'unknown'} 返回了结果]`;
           default:
             return '';
         }
@@ -51,7 +55,7 @@ function contentToText(content: unknown): string {
       .join(' ');
   }
 
-  // 兜底
+  // 兜底：不应该走到这里，但防御性处理
   return String(content ?? '');
 }
 

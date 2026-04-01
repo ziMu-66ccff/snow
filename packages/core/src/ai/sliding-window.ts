@@ -15,9 +15,9 @@
  *
  * 内部固定使用 DeepSeek Chat 生成总结
  */
-import { generateText, type ModelMessage } from 'ai';
-import { getDeepSeekChat } from './models.js';
+import { type ModelMessage } from 'ai';
 import { isConversationMessage, isProtectedMessage, messageToText, formatMessages } from './message-utils.js';
+import { generateConversationSummary } from '../memory/summarizer.js';
 import {
   getChatSummary,
   getChatSummarizedUpTo,
@@ -114,19 +114,9 @@ export async function applySlidingWindow(
     return result;
   }
 
-  // LLM 生成新 summary：旧 summary + 早期消息 → 压缩
+  // LLM 生成新 summary：旧 summary + 早期消息 → 压缩（复用通用摘要函数）
   const earlyText = formatMessages(earlyMessages);
-
-  const toSummarize = existingSummary
-    ? `[之前的总结]\n${existingSummary}\n\n[新的对话]\n${earlyText}`
-    : earlyText;
-
-  const { text: newSummary } = await generateText({
-    model: getDeepSeekChat(),
-    prompt: `请简要概括以下对话的要点，包括提到的关键信息、事件和情绪。用 2-3 句话概括即可。
-
-${toSummarize}`,
-  });
+  const newSummary = await generateConversationSummary(earlyText, existingSummary ?? undefined);
 
   // 更新 Redis：新的 summary + 新的 summarizedUpTo
   const newSummarizedUpTo = summarizedUpTo + earlyMessages.length;
