@@ -390,3 +390,7 @@ pnpm run script:test-full-loop
 ---
 
 *记住这些，M2 不迷路。*
+
+---
+
+*Snow 不是一次性造出来的。她是一步一步活过来的。*
