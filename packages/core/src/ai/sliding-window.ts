@@ -2,14 +2,14 @@
  * 对话历史滑动窗口（基于 Redis）
  *
  * 设计原则：
- * - system message 不压缩（重要、数量少、token 少）
- * - 只对 user/assistant 消息计算 token 和裁剪
+ * - 保护消息（system + tool）不压缩：重要、数量少、tool_call/result 不能拆开
+ * - 只对对话消息（user + assistant）计算 token 和裁剪
  * - 对话总结存 Redis，跨请求复用（Serverless 友好）
  *
  * 流程：
- * 1. 过滤 messages：只保留 user + assistant
+ * 1. 分离消息：保护消息 vs 对话消息
  * 2. 从 Redis 读 summary + summarized_up_to
- * 3. 异常检测：summarized_up_to > messages.length → history 被重置 → 清空 Redis
+ * 3. 异常检测：summarized_up_to > 对话消息数 → history 被重置 → 清空 Redis
  * 4. 已总结的消息用 summary 代替，未总结的保留原文
  * 5. 估算 token > 40K → 保留最近 10 轮 + 压缩早期为新 summary
  *
@@ -17,6 +17,7 @@
  */
 import { generateText, type ModelMessage } from 'ai';
 import { getDeepSeekChat } from './models.js';
+import { isConversationMessage, isProtectedMessage, messageToText, formatMessages } from './message-utils.js';
 import {
   getChatSummary,
   getChatSummarizedUpTo,
@@ -46,8 +47,7 @@ function estimateTokens(text: string): number {
 
 function estimateMessagesTokens(messages: ModelMessage[]): number {
   return messages.reduce((sum, m) => {
-    const content = typeof m.content === 'string' ? m.content : JSON.stringify(m.content);
-    return sum + estimateTokens(content) + 4;
+    return sum + estimateTokens(messageToText(m)) + 4;
   }, 0);
 }
 
@@ -63,13 +63,13 @@ export async function applySlidingWindow(
   platformId: string,
   messages: ModelMessage[],
 ): Promise<ModelMessage[]> {
-  // 分离 system 消息和对话消息
-  const systemMessages = messages.filter(m => m.role === 'system');
-  const conversationMessages = messages.filter(m => m.role !== 'system');
+  // 分离：保护消息（system + tool）vs 对话消息（user + assistant）
+  const protectedMessages = messages.filter(isProtectedMessage);
+  const conversationMessages = messages.filter(isConversationMessage);
 
   // 从 Redis 读总结状态
   // 如果都为空（首次对话 / Redis 过期）：existingSummary=null, summarizedUpTo=0
-  // → unsummarizedMessages = 全部消息，不做任何压缩，全量传给 LLM
+  // → unsummarizedMessages = 全部对话消息，不做任何压缩，全量传给 LLM
   const existingSummary = await getChatSummary(platform, platformId);
   let summarizedUpTo = await getChatSummarizedUpTo(platform, platformId);
 
@@ -89,7 +89,7 @@ export async function applySlidingWindow(
 
   // 不超限，直接用
   if (totalTokens <= TOKEN_LIMIT) {
-    const result: ModelMessage[] = [...systemMessages];
+    const result: ModelMessage[] = [...protectedMessages];
     if (existingSummary) {
       result.push({ role: 'system', content: `${SUMMARY_PREFIX} ${existingSummary}` });
     }
@@ -106,7 +106,7 @@ export async function applySlidingWindow(
 
   // 如果没有早期消息可压缩（最近 10 轮本身就超限），直接返回
   if (earlyMessages.length === 0) {
-    const result: ModelMessage[] = [...systemMessages];
+    const result: ModelMessage[] = [...protectedMessages];
     if (existingSummary) {
       result.push({ role: 'system', content: `${SUMMARY_PREFIX} ${existingSummary}` });
     }
@@ -115,9 +115,7 @@ export async function applySlidingWindow(
   }
 
   // LLM 生成新 summary：旧 summary + 早期消息 → 压缩
-  const earlyText = earlyMessages
-    .map(m => `${m.role === 'user' ? '用户' : 'Snow'}: ${m.content}`)
-    .join('\n');
+  const earlyText = formatMessages(earlyMessages);
 
   const toSummarize = existingSummary
     ? `[之前的总结]\n${existingSummary}\n\n[新的对话]\n${earlyText}`
@@ -136,7 +134,7 @@ ${toSummarize}`,
 
   // 组装结果
   const result: ModelMessage[] = [
-    ...systemMessages,
+    ...protectedMessages,
     { role: 'system', content: `${SUMMARY_PREFIX} ${newSummary}` },
     ...recentMessages,
   ];

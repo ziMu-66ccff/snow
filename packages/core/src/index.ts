@@ -9,6 +9,15 @@ export { getDeepSeekChat, getDeepSeekReasoner, getEmbeddingModel } from './ai/mo
 // AI — Prompt
 export { composeSystemPrompt, type PromptComposerContext } from './ai/prompts/composer.js';
 
+// AI — Message Utils（统一处理 ModelMessage 多类型 content）
+export {
+  messageToText,
+  formatMessage,
+  formatMessages,
+  isConversationMessage,
+  isProtectedMessage,
+} from './ai/message-utils.js';
+
 // AI — Chat（外界只需要这一个函数 + CLI 善后函数）
 export { getChatResponse, finalizeSession, type ChatInput } from './ai/chat.js';
 

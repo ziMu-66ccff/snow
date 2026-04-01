@@ -14,6 +14,7 @@ import { eq, and } from 'drizzle-orm';
 import { getDeepSeekChat } from './models.js';
 import { composeSystemPrompt } from './prompts/composer.js';
 import { applySlidingWindow } from './sliding-window.js';
+import { messageToText } from './message-utils.js';
 import { retrieveMemories } from '../memory/retriever.js';
 import { executeMemoryExtraction, executeDelayedExtraction } from '../memory/extract-task.js';
 import { scheduleDelayedExtraction, cancelDelayedExtraction } from '../memory/delayed-task.js';
@@ -37,21 +38,6 @@ export interface ChatInput {
   platform: string;
   /** 完整对话历史（含当前消息，对齐 AI SDK useChat 标准） */
   messages: ModelMessage[];
-}
-
-/**
- * 从 message content 中提取纯文本
- * content 可能是 string 或 Array<TextPart | ImagePart | ...>
- */
-function extractTextFromContent(content: unknown): string {
-  if (typeof content === 'string') return content;
-  if (Array.isArray(content)) {
-    return content
-      .filter((part: any) => part.type === 'text' && part.text)
-      .map((part: any) => part.text)
-      .join('');
-  }
-  return JSON.stringify(content);
 }
 
 /**
@@ -153,7 +139,7 @@ export async function getChatResponse(input: ChatInput): Promise<ReturnType<type
   // 提取当前用户消息的文本（取最后一条 user 消息，而非 messages 最后一条）
   const lastUserMessage = [...messages].reverse().find(m => m.role === 'user');
   const currentMessageText = lastUserMessage
-    ? extractTextFromContent(lastUserMessage.content)
+    ? messageToText(lastUserMessage)
     : '';
 
   // 检索记忆
