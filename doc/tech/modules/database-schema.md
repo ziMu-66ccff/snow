@@ -244,8 +244,9 @@ LIMIT 5;
 - `INDEX(user_id)` — 按用户查询对话历史
 
 **业务说明**：
-- `summary` 在对话结束时异步生成，下次对话开始时作为"上次我们聊了什么"注入 Prompt
-- 不存储完整的消息列表（消息在对话过程中存内存 / Redis，结束后只保留摘要）
+- `summary` 由 30 分钟延时任务持久化（从 Redis `context_summary` 写入）
+- 新会话时作为"上次对话摘要"注入 Prompt（PG 冷数据，Redis 过期时的兜底）
+- 不存储完整的消息列表——消息由外界管理（CLI 内存 / Web 前端 useChat / QQ Redis）
 - 这是一个有意的设计决策：摘要比原始消息更高效，也更符合"人脑记忆"的特点
 
 ---
@@ -288,19 +289,23 @@ LIMIT 5;
 
 ## 三、Redis 缓存结构
 
-除了 PostgreSQL，Snow 还使用 Upstash Redis 存储**高频读写、临时性**的数据：
+除了 PostgreSQL，Snow 还使用 Upstash Redis 存储**高频读写、临时性**的数据。
+
+所有 key 使用 `platform:platformId` 作为用户标识（可读、不依赖 DB 查询），统一 10 小时 TTL。
 
 | Key 模式 | 值类型 | TTL | 用途 |
 |----------|--------|-----|------|
-| `emotion:{userId}` | JSON | 24h | Snow 对该用户的**当前**情绪状态 |
-| `session:{sessionId}` | JSON | 2h | 当前对话的最近几轮上下文 |
-| `relation:{userId}` | JSON | 1h | 关系缓存（避免每次查 PG） |
-| `rate:{userId}` | Counter | 1min | 频率限制（防滥用） |
+| `snow:user:identity:{platform}:{platformId}` | JSON | 10h | 用户身份缓存（userId, userName, role, stage, intimacyScore） |
+| `snow:memory:unextracted:{platform}:{platformId}` | List | 10h | 待提取的消息队列（每轮对话 push，提取后清空） |
+| `snow:memory:context_summary:{platform}:{platformId}` | String | 10h | 记忆提取的上下文摘要（已提取部分的 LLM 总结） |
+| `snow:chat:summary:{platform}:{platformId}` | String | 10h | 滑动窗口的对话总结（早期对话压缩后的摘要） |
+| `snow:chat:summarized_up_to:{platform}:{platformId}` | Number | 10h | 滑动窗口的总结覆盖到对话消息的第几条 |
+| `emotion:{userId}` | JSON | 24h | Snow 对该用户的**当前**情绪状态（Batch 6） |
 
 **为什么用 Redis 而不是都存 PG？**
-- 情绪状态每次对话都要读写，PG 延迟 5-50ms，Redis < 1ms
-- 对话上下文是临时的，对话结束就不需要了
-- 关系状态在一次对话中不会变（对话后才异步更新），缓存即可
+- 待提取消息队列每次对话都要 push，PG 延迟 5-50ms，Redis < 1ms
+- 上下文摘要是临时的，TTL 过期后从 PG 冷数据恢复
+- 用户身份在一次会话中不会变，缓存即可
 
 ---
 
@@ -357,6 +362,7 @@ users (1) ──── (1) personality_customizations
 |------|------|----------|
 | 2026-03-30 | v0.1 | 初稿：SQL DDL 定义 |
 | 2026-03-30 | v0.2 | 重写：以 schema.ts 为准，添加详细字段说明、业务上下文、Redis 缓存、ER 图 |
+| 2026-04-01 | v0.3 | Redis 缓存重写（platform:platformId 可读 key，10h TTL），conversations 表说明更新 |
 
 ---
 

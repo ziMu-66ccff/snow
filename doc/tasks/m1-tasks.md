@@ -71,10 +71,17 @@ packages/qq    → @snow/core（M4+）
 
 ### core 对外 API
 ```typescript
-import { chat, initDatabase } from '@snow/core';
+import { getChatResponse, finalizeSession } from '@snow/core';
 
-await initDatabase();
-const response = await chat({ userId: 'zimu', message: '你好' });
+// 外界只需要传 3 个参数，其余全自动
+const result = await getChatResponse({
+  platformId: 'zimu',
+  platform: 'system',
+  messages,  // 完整对话历史，含当前消息（对齐 AI SDK useChat）
+});
+
+// CLI 退出时善后（Web/QQ 不需要）
+await finalizeSession('zimu', 'system');
 ```
 
 ---
