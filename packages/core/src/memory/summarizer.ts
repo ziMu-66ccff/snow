@@ -41,32 +41,19 @@ ${toSummarize}`,
   return summary;
 }
 
-/** 上下文摘要的字符长度阈值，超过则用 LLM 压缩 */
-const CONTEXT_SUMMARY_MAX_LENGTH = 1500;
-
 /**
- * 压缩上下文摘要
+ * 生成/更新记忆提取的上下文摘要
  *
- * 用于增量记忆提取时维护"之前已提取部分的摘要"。
- * 当摘要累积过长时，用 LLM 压缩为要点，控制 token 开销。
+ * 每次增量提取后调用，将旧摘要 + 新对话内容压缩为新摘要。
+ * 始终调用 LLM 生成摘要（不拼接原文），确保摘要质量稳定。
  *
- * @param currentSummary - 当前累积的上下文摘要
+ * @param currentSummary - 当前累积的上下文摘要（可能为空）
  * @param newContent - 刚刚提取过的新对话内容
- * @returns 压缩后的摘要
+ * @returns 新的摘要
  */
 export async function compressContextSummary(
   currentSummary: string,
   newContent: string,
 ): Promise<string> {
-  const combined = currentSummary
-    ? `${currentSummary}\n${newContent}`
-    : newContent;
-
-  // 不超长，直接拼接
-  if (combined.length <= CONTEXT_SUMMARY_MAX_LENGTH) {
-    return combined;
-  }
-
-  // 超长了，用通用摘要函数压缩
-  return generateConversationSummary(newContent, currentSummary, 400);
+  return generateConversationSummary(newContent, currentSummary || undefined, 200);
 }
