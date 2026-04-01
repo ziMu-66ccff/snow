@@ -15,7 +15,8 @@
     "script:chat": "tsx packages/core/scripts/chat.ts",
     "script:test-chat": "tsx packages/core/scripts/test-chat.ts",
     "script:test-memory-write": "tsx packages/core/scripts/test-memory-write.ts",
-    "script:test-memory-retrieval": "tsx packages/core/scripts/test-memory-retrieval.ts"
+    "script:test-memory-retrieval": "tsx packages/core/scripts/test-memory-retrieval.ts",
+    "script:gc-memories": "tsx packages/core/scripts/gc-memories.ts"
   },
   "devDependencies": {
     "dotenv": "^16.4.0",

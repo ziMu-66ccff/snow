@@ -18,7 +18,7 @@ export async function getBasicFacts(userId: string) {
 export async function getLastConversationSummary(userId: string) {
   return db.query.conversations.findFirst({
     where: eq(conversations.userId, userId),
-    orderBy: [desc(conversations.startedAt)],
+    orderBy: [desc(conversations.createdAt)],
   });
 }
 
@@ -83,16 +83,12 @@ export async function insertConversation(params: {
   userId: string;
   platform: string;
   summary: string;
-  startedAt?: Date;
-  endedAt?: Date;
   emotionSnapshot?: Record<string, unknown>;
 }) {
   const [inserted] = await db.insert(conversations)
     .values({
       userId: params.userId,
       platform: params.platform,
-      startedAt: params.startedAt ?? new Date(),
-      endedAt: params.endedAt ?? new Date(),
       summary: params.summary,
       emotionSnapshot: params.emotionSnapshot,
     })

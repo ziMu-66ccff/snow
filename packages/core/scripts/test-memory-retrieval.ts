@@ -41,8 +41,6 @@ Snow: 你一定可以的，记得多喝水放松一下`;
     await insertConversation({
       userId: user.id,
       platform: '__test__',
-      startedAt: new Date(Date.now() - 60000),
-      endedAt: new Date(),
       summary: '用户叫李四，在北京做后端开发，下周三有个技术分享讲微服务架构，有点紧张。',
     });
     console.log('   ✅ 摘要已写入');

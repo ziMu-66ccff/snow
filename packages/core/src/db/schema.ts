@@ -109,16 +109,15 @@ export const semanticMemories = pgTable('semantic_memories', {
 ]);
 
 // ============================================
-// 对话记录表
+// 对话摘要表（由延时任务持久化 Redis context_summary）
 // ============================================
 export const conversations = pgTable('conversations', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').references(() => users.id).notNull(),
   platform: varchar('platform', { length: 64 }).notNull(),
-  startedAt: timestamp('started_at').defaultNow().notNull(),
-  endedAt: timestamp('ended_at'),
   summary: text('summary'),
   emotionSnapshot: jsonb('emotion_snapshot'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => [
   index('idx_conversations_user').on(table.userId),
 ]);

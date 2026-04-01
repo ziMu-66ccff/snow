@@ -250,6 +250,9 @@ Snow 对不同用户态度不同，对 zimu 最亲密。
 3. 编写关系层 Prompt 模板（5 个阶段 + 主人模式）
 4. 更新 Prompt Composer：注入关系层
 5. chat 脚本退出时调用关系更新
+6. **关系更新后清 Redis 身份缓存**（`snow:user:identity:{platform}:{platformId}`）
+   - 亲密度/阶段变更后，缓存里的旧值会导致 Snow 态度不变
+   - 在关系更新成功后调用 `clearAllRedisKeys` 或只清 identity key
 
 ### 验证
 ```bash
@@ -375,8 +378,8 @@ pnpm run script:test-full-loop
 
 | 项目 | M1 现状 | M2 需要做 |
 |------|--------|----------|
-| conversations 表 | startedAt/endedAt 填当前时间（无意义） | 考虑简化表结构或移除这两个字段 |
-| 记忆 GC（垃圾回收） | 未实现 | 定期清理鲜活度极低的语义记忆（每周跑一次） |
+| ~~conversations 表~~ | ~~已简化：移除 startedAt/endedAt，只保留 createdAt~~ | ✅ 已完成 |
+| ~~记忆 GC（垃圾回收）~~ | ~~已实现：gc.ts + gc-memories 脚本~~ | ✅ 已完成（建议 M2 加 Cron Job 自动化） |
 | HNSW 向量索引 | 未创建（数据量小） | 数据量大后添加，提升向量搜索性能 |
 
 ### 用户身份
@@ -384,7 +387,7 @@ pnpm run script:test-full-loop
 | 项目 | M1 现状 | M2 需要做 |
 |------|--------|----------|
 | 未注册用户 | 自动创建 users + user_relations | 考虑是否需要更复杂的注册流程 |
-| 身份缓存 | Redis 10h TTL | 关系/亲密度变更后需要主动清缓存 |
+| 身份缓存清理 | 已记录到 Batch 5 任务 | Batch 5 实现：关系更新后清 Redis 缓存 |
 | 跨平台账号 | 同一人不同平台 = 不同用户 | M4: 账号合并 |
 
 ---

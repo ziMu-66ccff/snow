@@ -28,3 +28,4 @@ export { retrieveMemories, type RetrievedMemories } from './memory/retriever.js'
 export { memoryVividness } from './memory/vividness.js';
 export { compressContextSummary } from './memory/summarizer.js';
 export { executeMemoryExtraction, executeDelayedExtraction } from './memory/extract-task.js';
+export { gcUserMemories, gcAllMemories } from './memory/gc.js';
