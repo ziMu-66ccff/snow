@@ -115,8 +115,9 @@ export async function applySlidingWindow(
   }
 
   // LLM 生成新 summary：旧 summary + 早期消息 → 压缩（复用通用摘要函数）
+  // 滑动窗口用 400 字（需要接上话），比记忆提取上下文的 200 字更长
   const earlyText = formatMessages(earlyMessages);
-  const newSummary = await generateConversationSummary(earlyText, existingSummary ?? undefined);
+  const newSummary = await generateConversationSummary(earlyText, existingSummary ?? undefined, 400);
 
   // 更新 Redis：新的 summary + 新的 summarizedUpTo
   const newSummarizedUpTo = summarizedUpTo + earlyMessages.length;
