@@ -35,7 +35,7 @@ export type MemoryExtraction = z.infer<typeof memoryExtractionSchema>;
 /**
  * 从对话中提取记忆（增量提取）
  * 内部固定使用 DeepSeek Chat（结构化任务，不需要动态选模型）
- *
+ * 
  * 一次 LLM 调用，同时提取事实记忆 + 语义印象 + 更新
  * 原则：宁精不滥，一次最多提取 5 条事实 + 3 条印象
  *

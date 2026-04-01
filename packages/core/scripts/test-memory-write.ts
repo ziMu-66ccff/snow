@@ -1,5 +1,6 @@
 /**
  * Batch 3 验证脚本：记忆提取 + 写入
+ * 使用独立测试用户，不污染真实数据
  */
 import { config } from 'dotenv';
 config({ path: '.env.local' });

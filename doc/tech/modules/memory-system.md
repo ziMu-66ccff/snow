@@ -542,3 +542,80 @@ Snow 的记忆不是硬盘，不是数据库。
 |------|------|------|
 | 2026-03-30 | v0.1 | 初稿：三层架构、读写流程 |
 | 2026-03-30 | v0.2 | 完善：四种存储详解、鲜活度模型、提取方案、检索策略、Token 预算、遗忘机制 |
+| 2026-04-01 | v1.0 | **V2 架构重构**：见下方"八、V2 架构更新"，替代 §四提取方案 + §六Token预算 |
+
+---
+
+## 八、V2 架构更新（2026-04-01）
+
+> 本章替代原 §四"记忆提取方案"和 §六"Token 预算分配"。
+> §一\~§三（存储设计、鲜活度模型）和 §五（检索方案）不变。
+
+### 8.1 核心设计变更
+
+**外界只需要调一个函数**：
+
+```typescript
+const response = await getChatResponse({
+  platformId: 'zimu',
+  platform: 'system',
+  messages,  // 完整对话历史，含当前消息（对齐 AI SDK useChat 标准）
+});
+```
+
+以下全部是 core 内部逻辑：用户身份查询、记忆检索、滑动窗口、增量提取、延时任务、摘要管理。
+
+### 8.2 增量记忆提取
+
+**不再等"对话结束"，改为增量提取 + 延时兜底**：
+
+| 触发条件 | 做什么 |
+|---------|--------|
+| Redis `unextracted` 队列 >= 10 条（5 轮） | 异步提取记忆 + 更新上下文摘要 |
+| 30 分钟延时任务到期 | 提取剩余记忆 + 持久化摘要到 PG |
+
+每次 getChatResponse 被调用后，user + assistant 消息 push 到 Redis `snow:memory:unextracted:{userId}`。
+
+**提取流程**：
+1. 原子取出 unextracted（rename 防丢数据）
+2. Redis 读 context_summary 作为背景上下文
+3. LLM 提取 facts + impressions + updates → 写 PG
+4. LLM 生成新 context_summary → 更新 Redis
+5. 延时任务额外：持久化 context_summary 到 PG conversations 表
+
+### 8.3 滑动窗口（替代原 §六）
+
+**基于 Redis 的 summary 管理**，40K token 上限：
+
+- 过滤 messages：只保留 user + assistant
+- Redis 存 `chat:summary` + `chat:summarized_up_to`
+- 已总结的消息用 summary 代替，未总结的保留原文
+- 超 40K → 保留最近 10 轮 + LLM 压缩早期为新 summary
+- summarized_up_to > messages.length → 检测到 history 重置 → 清空 Redis
+
+### 8.4 Redis 设计
+
+| Key | 类型 | TTL | 说明 |
+|-----|------|-----|------|
+| `snow:user:identity:{platform}:{platformId}` | JSON | 10h | 用户身份缓存 |
+| `snow:memory:unextracted:{userId}` | List | 10h | 待提取消息队列 |
+| `snow:memory:context_summary:{userId}` | String | 10h | 记忆提取上下文摘要 |
+| `snow:chat:summary:{userId}` | String | 10h | 滑动窗口对话总结 |
+| `snow:chat:summarized_up_to:{userId}` | Number | 10h | 总结覆盖到第几条 |
+
+### 8.5 上次会话上下文
+
+新会话（messages 只有 1 条）时注入 Prompt：
+
+1. Redis 热数据：`context_summary`（还没过期）
+2. PG 冷数据：`conversations` 表最近摘要（延时任务已持久化）
+3. 都没有 = 新用户
+
+### 8.6 各壳接入
+
+```typescript
+// CLI：messages 存内存
+// Web：messages 由前端 useChat 管理
+// QQ/微信：messages 存 Redis
+// 都只需要调 getChatResponse({ platformId, platform, messages })
+```

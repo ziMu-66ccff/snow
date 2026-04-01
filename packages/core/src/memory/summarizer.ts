@@ -1,55 +1,15 @@
-import { generateText } from 'ai';
-import { getDeepSeekChat } from '../ai/models.js';
-import { insertConversation } from '../db/queries/memory-read.js';
-
 /**
- * 生成对话摘要（纯 LLM 调用，不写 DB）
+ * 摘要压缩工具
  * 内部固定使用 DeepSeek Chat
  */
-export async function generateSummary(conversationMessages: string): Promise<string> {
-  const { text: summary } = await generateText({
-    model: getDeepSeekChat(),
-    prompt: `请用一两句话简要概括以下对话的主要内容和情感基调。
-要求：
-- 用第三人称描述（"用户"和"Snow"）
-- 提到关键话题和情绪
-- 不超过 100 字
-
-对话内容：
-${conversationMessages}`,
-  });
-
-  return summary;
-}
-
-/**
- * 生成对话摘要并写入 conversations 表
- */
-export async function generateAndSaveConversationSummary(params: {
-  userId: string;
-  conversationMessages: string;
-  platform?: string;
-  startedAt: Date;
-}): Promise<string> {
-  const summary = await generateSummary(params.conversationMessages);
-
-  await insertConversation({
-    userId: params.userId,
-    platform: params.platform ?? 'cli',
-    startedAt: params.startedAt,
-    endedAt: new Date(),
-    summary,
-  });
-
-  return summary;
-}
+import { generateText } from 'ai';
+import { getDeepSeekChat } from '../ai/models.js';
 
 /** 上下文摘要的字符长度阈值，超过则用 LLM 压缩 */
 const CONTEXT_SUMMARY_MAX_LENGTH = 1500;
 
 /**
  * 压缩上下文摘要
- * 内部固定使用 DeepSeek Chat
  *
  * 用于增量记忆提取时维护"之前已提取部分的摘要"。
  * 当摘要累积过长时，用 LLM 压缩为要点，控制 token 开销。
@@ -66,10 +26,12 @@ export async function compressContextSummary(
     ? `${currentSummary}\n${newContent}`
     : newContent;
 
+  // 不超长，直接拼接
   if (combined.length <= CONTEXT_SUMMARY_MAX_LENGTH) {
     return combined;
   }
 
+  // 超长了，LLM 压缩为要点
   const { text: compressed } = await generateText({
     model: getDeepSeekChat(),
     prompt: `请将以下对话记录压缩为一段简洁的要点摘要。
