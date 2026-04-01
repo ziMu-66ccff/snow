@@ -59,7 +59,9 @@ export async function executeMemoryExtraction(user: UserIdentifier): Promise<voi
 
 /**
  * 延时任务执行的完整流程
- * 除了提取记忆，还要持久化 context_summary 到 PG conversations 表
+ * 除了提取记忆，还要：
+ * 1. 持久化 context_summary 到 PG conversations 表
+ * 2. 顺便跑一次记忆 GC（清理鲜活度极低的语义记忆）
  */
 export async function executeDelayedExtraction(user: UserIdentifier): Promise<void> {
   // 提取记忆（如果有未提取的）
@@ -73,5 +75,12 @@ export async function executeDelayedExtraction(user: UserIdentifier): Promise<vo
       platform: user.platform,
       summary,
     });
+  }
+
+  // 顺便跑一次记忆 GC（空闲时清理，不阻塞对话）
+  try {
+    await gcUserMemories(user.userId);
+  } catch (err) {
+    console.error('[delayed-task] 记忆 GC 失败:', err);
   }
 }
