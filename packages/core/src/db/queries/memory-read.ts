@@ -76,22 +76,23 @@ export async function reinforceMemories(memoryIds: string[]) {
 }
 
 /**
- * 写入对话记录（含摘要）
+ * 写入对话摘要
+ * 主要由延时任务调用，持久化 Redis 的 context_summary
  */
 export async function insertConversation(params: {
   userId: string;
   platform: string;
-  startedAt: Date;
-  endedAt: Date;
   summary: string;
+  startedAt?: Date;
+  endedAt?: Date;
   emotionSnapshot?: Record<string, unknown>;
 }) {
   const [inserted] = await db.insert(conversations)
     .values({
       userId: params.userId,
       platform: params.platform,
-      startedAt: params.startedAt,
-      endedAt: params.endedAt,
+      startedAt: params.startedAt ?? new Date(),
+      endedAt: params.endedAt ?? new Date(),
       summary: params.summary,
       emotionSnapshot: params.emotionSnapshot,
     })

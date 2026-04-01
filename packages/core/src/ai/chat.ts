@@ -4,7 +4,10 @@
  * 外界只需要调这一个函数，传入 platformId + platform + messages。
  * 内部自动完成：用户身份查询、记忆检索、滑动窗口、LLM 回复、异步记忆提取。
  *
- * 对齐 Vercel AI SDK useChat 标准：messages 包含完整对话历史（含当前消息）。
+ * 对齐 Vercel AI SDK useChat 标准：
+ * - messages 包含完整对话历史（含当前消息）
+ * - 返回 streamText 原始结果（壳可用 toUIMessageStreamResponse / textStream 等）
+ * - 记忆处理通过 onFinish 自动触发，不依赖外界
  */
 import { streamText, type ModelMessage } from 'ai';
 import { eq, and } from 'drizzle-orm';
@@ -36,8 +39,19 @@ export interface ChatInput {
   messages: ModelMessage[];
 }
 
-export interface ChatResponse {
-  textStream: AsyncIterable<string>;
+/**
+ * 从 message content 中提取纯文本
+ * content 可能是 string 或 Array<TextPart | ImagePart | ...>
+ */
+function extractTextFromContent(content: unknown): string {
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    return content
+      .filter((part: any) => part.type === 'text' && part.text)
+      .map((part: any) => part.text)
+      .join('');
+  }
+  return JSON.stringify(content);
 }
 
 /**
@@ -94,7 +108,7 @@ async function resolveUserIdentity(platform: string, platformId: string): Promis
  *
  * 优先级：
  * 1. Redis 热数据（context_summary）
- * 2. PG 冷数据（conversations 表的摘要）
+ * 2. PG 冷数据（conversations 表的摘要，延时任务已持久化，内容一致只是存储位置不同）
  * 3. 都没有 = 新用户
  */
 async function getLastSessionContext(
@@ -104,7 +118,7 @@ async function getLastSessionContext(
   const summary = await getMemoryContextSummary(platform, platformId);
   if (summary) return summary;
 
-  // 其次 PG（冷数据，延时任务已持久化）
+  // 其次 PG（冷数据）
   const lastConvo = await getLastConversationSummary(userId);
   return lastConvo?.summary ?? undefined;
 }
@@ -113,8 +127,11 @@ async function getLastSessionContext(
  * Snow 核心对话函数
  *
  * 外界只需要传 platformId + platform + messages，其余全自动。
+ * 返回 streamText 原始结果：
+ * - CLI 用 result.textStream
+ * - Web 用 result.toUIMessageStreamResponse()
  */
-export async function getChatResponse(input: ChatInput): Promise<ChatResponse> {
+export async function getChatResponse(input: ChatInput): Promise<ReturnType<typeof streamText>> {
   const { platformId, platform, messages } = input;
 
   // ===== 阶段 1：用户身份 =====
@@ -123,8 +140,9 @@ export async function getChatResponse(input: ChatInput): Promise<ChatResponse> {
 
   // ===== 阶段 2：上下文准备 =====
 
-  // 判断新会话：messages 只有 1 条（当前用户消息）
-  const isNewSession = messages.length === 1;
+  // 判断新会话：只数 user 消息，排除 system/tool 等
+  const userMessageCount = messages.filter(m => m.role === 'user').length;
+  const isNewSession = userMessageCount === 1;
   const lastSessionContext = isNewSession
     ? await getLastSessionContext(platform, platformId, userId)
     : undefined;
@@ -132,12 +150,13 @@ export async function getChatResponse(input: ChatInput): Promise<ChatResponse> {
   // 滑动窗口处理（基于 Redis）
   const processedMessages = await applySlidingWindow(platform, platformId, messages);
 
-  // 检索记忆
-  const currentMessage = messages[messages.length - 1];
-  const currentMessageText = typeof currentMessage.content === 'string'
-    ? currentMessage.content
-    : JSON.stringify(currentMessage.content);
+  // 提取当前用户消息的文本（取最后一条 user 消息，而非 messages 最后一条）
+  const lastUserMessage = [...messages].reverse().find(m => m.role === 'user');
+  const currentMessageText = lastUserMessage
+    ? extractTextFromContent(lastUserMessage.content)
+    : '';
 
+  // 检索记忆
   const memories = await retrieveMemories(userId, currentMessageText, { intimacyScore });
 
   // 组装 Prompt
@@ -153,30 +172,21 @@ export async function getChatResponse(input: ChatInput): Promise<ChatResponse> {
 
   // ===== 阶段 3：LLM 回复 =====
   const model = getDeepSeekChat(); // 未来支持动态路由
+  const userIdentifier = { userId, platform, platformId };
 
   const result = streamText({
     model,
     system: systemPrompt,
     messages: processedMessages,
-  });
 
-  // ===== 阶段 4：包装 stream，流结束后异步处理记忆 =====
-  const userIdentifier = { userId, platform, platformId };
-  const wrappedStream = (async function* () {
-    let fullResponse = '';
-    for await (const chunk of result.textStream) {
-      fullResponse += chunk;
-      yield chunk;
-    }
-
-    // 流消费完毕，异步处理记忆（不阻塞）
-    setImmediate(async () => {
+    // ===== 阶段 4：流结束后自动处理记忆（不依赖外界） =====
+    onFinish: async ({ text }) => {
       try {
         // push 到 Redis unextracted
         await pushUnextractedMessages(
           platform, platformId,
           `用户: ${currentMessageText}`,
-          `Snow: ${fullResponse}`,
+          `Snow: ${text}`,
         );
 
         // 检查是否触发轮次提取
@@ -190,10 +200,12 @@ export async function getChatResponse(input: ChatInput): Promise<ChatResponse> {
       } catch (err) {
         console.error('[getChatResponse] 异步记忆处理失败:', err);
       }
-    });
-  })();
+    },
+  });
 
-  return { textStream: wrappedStream };
+  // 返回 streamText 原始结果
+  // CLI 用 result.textStream，Web 用 result.toUIMessageStreamResponse()
+  return result;
 }
 
 /**

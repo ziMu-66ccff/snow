@@ -68,6 +68,8 @@ export async function applySlidingWindow(
   const conversationMessages = messages.filter(m => m.role !== 'system');
 
   // 从 Redis 读总结状态
+  // 如果都为空（首次对话 / Redis 过期）：existingSummary=null, summarizedUpTo=0
+  // → unsummarizedMessages = 全部消息，不做任何压缩，全量传给 LLM
   const existingSummary = await getChatSummary(platform, platformId);
   let summarizedUpTo = await getChatSummarizedUpTo(platform, platformId);
 

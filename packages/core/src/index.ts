@@ -10,7 +10,7 @@ export { getDeepSeekChat, getDeepSeekReasoner, getEmbeddingModel } from './ai/mo
 export { composeSystemPrompt, type PromptComposerContext } from './ai/prompts/composer.js';
 
 // AI — Chat（外界只需要这一个函数 + CLI 善后函数）
-export { getChatResponse, finalizeSession, type ChatInput, type ChatResponse } from './ai/chat.js';
+export { getChatResponse, finalizeSession, type ChatInput } from './ai/chat.js';
 
 // Memory（内部使用，但也导出供测试和高级用途）
 export { extractMemories, type MemoryExtraction } from './memory/extractor.js';

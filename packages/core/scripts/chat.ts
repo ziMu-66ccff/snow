@@ -52,12 +52,13 @@ async function main() {
         messages.push({ role: 'user', content: message });
 
         // 调用 Snow（内部自动：身份查询、记忆检索、滑动窗口、异步记忆提取）
+        // 调用 Snow（返回 streamText 原始结果）
         process.stdout.write('Snow: ');
-        const { textStream } = await getChatResponse({ platformId, platform, messages });
+        const result = await getChatResponse({ platformId, platform, messages });
 
         // 消费流式回复
         let fullResponse = '';
-        for await (const chunk of textStream) {
+        for await (const chunk of result.textStream) {
           process.stdout.write(chunk);
           fullResponse += chunk;
         }

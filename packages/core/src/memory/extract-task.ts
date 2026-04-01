@@ -70,8 +70,6 @@ export async function executeDelayedExtraction(user: UserIdentifier): Promise<vo
     await insertConversation({
       userId: user.userId,
       platform: user.platform,
-      startedAt: new Date(),
-      endedAt: new Date(),
       summary,
     });
   }
