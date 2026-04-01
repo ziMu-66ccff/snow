@@ -15,7 +15,7 @@ import { createTestUser, cleanupTestUser } from './test-utils.js';
 async function test() {
   console.log('🧪 Batch 3 验证：记忆提取 + 写入\n');
 
-  const { user } = await createTestUser('memory_write_test');
+  const { user, platform, platformId } = await createTestUser('memory_write_test');
   console.log('');
 
   try {
@@ -68,7 +68,7 @@ Snow: 小美真好呀，有人陪着一起准备，感觉会安心很多`;
     console.log('\n🎉 Batch 3 验证完成！');
   } finally {
     console.log('\n--- 清理测试数据 ---\n');
-    await cleanupTestUser(user.id);
+    await cleanupTestUser(user.id, platform, platformId);
   }
 
   process.exit(0);

@@ -20,23 +20,30 @@ import {
 } from '../db/queries/redis-store.js';
 import { insertConversation } from '../db/queries/memory-read.js';
 
+/** 用户标识：PG 查询需要 userId，Redis 查询需要 platform + platformId */
+export interface UserIdentifier {
+  userId: string;
+  platform: string;
+  platformId: string;
+}
+
 /**
  * 执行一次增量记忆提取
  * 被轮次触发和延时任务共用
  */
-export async function executeMemoryExtraction(userId: string): Promise<void> {
+export async function executeMemoryExtraction(user: UserIdentifier): Promise<void> {
   // 1. 原子取出全部待提取消息
-  const messages = await popAllUnextractedMessages(userId);
+  const messages = await popAllUnextractedMessages(user.platform, user.platformId);
   if (messages.length === 0) return;
 
   const newMessagesText = messages.join('\n');
 
   // 2. 读上下文总结
-  const contextSummary = await getMemoryContextSummary(userId) ?? undefined;
+  const contextSummary = await getMemoryContextSummary(user.platform, user.platformId) ?? undefined;
 
   // 3. LLM 提取记忆 → 写 PG
   await writeMemories({
-    userId,
+    userId: user.userId,
     newMessages: newMessagesText,
     contextSummary,
   });
@@ -46,23 +53,23 @@ export async function executeMemoryExtraction(userId: string): Promise<void> {
     contextSummary ?? '',
     newMessagesText,
   );
-  await setMemoryContextSummary(userId, newSummary);
+  await setMemoryContextSummary(user.platform, user.platformId, newSummary);
 }
 
 /**
  * 延时任务执行的完整流程
  * 除了提取记忆，还要持久化 context_summary 到 PG conversations 表
  */
-export async function executeDelayedExtraction(userId: string): Promise<void> {
+export async function executeDelayedExtraction(user: UserIdentifier): Promise<void> {
   // 提取记忆（如果有未提取的）
-  await executeMemoryExtraction(userId);
+  await executeMemoryExtraction(user);
 
   // 持久化 context_summary 到 PG
-  const summary = await getMemoryContextSummary(userId);
+  const summary = await getMemoryContextSummary(user.platform, user.platformId);
   if (summary) {
     await insertConversation({
-      userId,
-      platform: 'auto',
+      userId: user.userId,
+      platform: user.platform,
       startedAt: new Date(),
       endedAt: new Date(),
       summary,

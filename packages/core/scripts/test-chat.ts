@@ -31,9 +31,9 @@ async function test() {
   console.log('');
 
   // 清理 identity 缓存（确保用测试数据）
-  const { redis } = await import('../src/db/redis.js');
-  await redis.del(`snow:user:identity:${owner.platform}:${owner.platformId}`);
-  await redis.del(`snow:user:identity:${stranger.platform}:${stranger.platformId}`);
+  const { clearAllRedisKeys } = await import('../src/db/queries/redis-store.js');
+  await clearAllRedisKeys(owner.platform, owner.platformId);
+  await clearAllRedisKeys(stranger.platform, stranger.platformId);
 
   try {
     // 测试 1：主人模式 — 问候
@@ -80,11 +80,12 @@ async function test() {
     console.log('   - 人设：有性格、有 emoji、不承认是 AI');
   } finally {
     console.log('\n--- 清理测试数据 ---\n');
-    await cleanupTestUser(owner.user.id);
-    await cleanupTestUser(stranger.user.id);
+    await cleanupTestUser(owner.user.id, owner.platform, owner.platformId);
+    await cleanupTestUser(stranger.user.id, stranger.platform, stranger.platformId);
     // 清理 identity 缓存
-    await redis.del(`snow:user:identity:${owner.platform}:${owner.platformId}`);
-    await redis.del(`snow:user:identity:${stranger.platform}:${stranger.platformId}`);
+    const { clearAllRedisKeys } = await import('../src/db/queries/redis-store.js');
+    await clearAllRedisKeys(owner.platform, owner.platformId);
+    await clearAllRedisKeys(stranger.platform, stranger.platformId);
   }
 
   process.exit(0);

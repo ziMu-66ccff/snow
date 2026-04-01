@@ -53,12 +53,14 @@ function estimateMessagesTokens(messages: ModelMessage[]): number {
 
 /**
  * 对 messages 应用滑动窗口
- * @param userId - 用户 ID（用于读写 Redis）
+ * @param platform - 平台标识
+ * @param platformId - 平台用户 ID
  * @param messages - 完整对话历史（含当前消息）
  * @returns 处理后的 messages 数组（可直接传给 LLM）
  */
 export async function applySlidingWindow(
-  userId: string,
+  platform: string,
+  platformId: string,
   messages: ModelMessage[],
 ): Promise<ModelMessage[]> {
   // 分离 system 消息和对话消息
@@ -66,12 +68,12 @@ export async function applySlidingWindow(
   const conversationMessages = messages.filter(m => m.role !== 'system');
 
   // 从 Redis 读总结状态
-  const existingSummary = await getChatSummary(userId);
-  let summarizedUpTo = await getChatSummarizedUpTo(userId);
+  const existingSummary = await getChatSummary(platform, platformId);
+  let summarizedUpTo = await getChatSummarizedUpTo(platform, platformId);
 
   // 异常检测：history 被重置了（新会话）
   if (summarizedUpTo > conversationMessages.length) {
-    await clearChatSummary(userId);
+    await clearChatSummary(platform, platformId);
     summarizedUpTo = 0;
   }
 
@@ -128,7 +130,7 @@ ${toSummarize}`,
 
   // 更新 Redis：新的 summary + 新的 summarizedUpTo
   const newSummarizedUpTo = summarizedUpTo + earlyMessages.length;
-  await setChatSummary(userId, newSummary, newSummarizedUpTo);
+  await setChatSummary(platform, platformId, newSummary, newSummarizedUpTo);
 
   // 组装结果
   const result: ModelMessage[] = [

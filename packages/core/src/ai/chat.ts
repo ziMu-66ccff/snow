@@ -26,8 +26,8 @@ import {
 } from '../db/queries/redis-store.js';
 import { getLastConversationSummary } from '../db/queries/memory-read.js';
 
-/** 每 N 轮增量提取一次记忆 */
-const EXTRACT_EVERY_N_MESSAGES = 10; // 5 轮 = 10 条消息
+/** 每 N 条消息增量提取一次记忆（5 轮 = 10 条） */
+const EXTRACT_EVERY_N_MESSAGES = 10;
 
 export interface ChatInput {
   platformId: string;
@@ -41,7 +41,7 @@ export interface ChatResponse {
 }
 
 /**
- * 查询用户身份（Redis 缓存 → PG 查询）
+ * 查询用户身份（Redis 缓存 → PG 查询 → 自动创建）
  */
 async function resolveUserIdentity(platform: string, platformId: string): Promise<CachedUserIdentity> {
   // Redis 缓存命中
@@ -85,7 +85,6 @@ async function resolveUserIdentity(platform: string, platformId: string): Promis
     intimacyScore: relation?.intimacyScore ?? 0,
   };
 
-  // 缓存到 Redis
   await setCachedUserIdentity(platform, platformId, identity);
   return identity;
 }
@@ -94,16 +93,18 @@ async function resolveUserIdentity(platform: string, platformId: string): Promis
  * 获取上次会话上下文（新会话时注入 Prompt）
  *
  * 优先级：
- * 1. Redis 热数据（context_summary + unextracted 消息）
+ * 1. Redis 热数据（context_summary）
  * 2. PG 冷数据（conversations 表的摘要）
  * 3. 都没有 = 新用户
  */
-async function getLastSessionContext(userId: string): Promise<string | undefined> {
-  // 优先 Redis
-  const summary = await getMemoryContextSummary(userId);
+async function getLastSessionContext(
+  platform: string, platformId: string, userId: string,
+): Promise<string | undefined> {
+  // 优先 Redis（热数据）
+  const summary = await getMemoryContextSummary(platform, platformId);
   if (summary) return summary;
 
-  // 其次 PG
+  // 其次 PG（冷数据，延时任务已持久化）
   const lastConvo = await getLastConversationSummary(userId);
   return lastConvo?.summary ?? undefined;
 }
@@ -125,11 +126,11 @@ export async function getChatResponse(input: ChatInput): Promise<ChatResponse> {
   // 判断新会话：messages 只有 1 条（当前用户消息）
   const isNewSession = messages.length === 1;
   const lastSessionContext = isNewSession
-    ? await getLastSessionContext(userId)
+    ? await getLastSessionContext(platform, platformId, userId)
     : undefined;
 
   // 滑动窗口处理（基于 Redis）
-  const processedMessages = await applySlidingWindow(userId, messages);
+  const processedMessages = await applySlidingWindow(platform, platformId, messages);
 
   // 检索记忆
   const currentMessage = messages[messages.length - 1];
@@ -160,7 +161,7 @@ export async function getChatResponse(input: ChatInput): Promise<ChatResponse> {
   });
 
   // ===== 阶段 4：包装 stream，流结束后异步处理记忆 =====
-  const self = { userId };
+  const userIdentifier = { userId, platform, platformId };
   const wrappedStream = (async function* () {
     let fullResponse = '';
     for await (const chunk of result.textStream) {
@@ -173,19 +174,19 @@ export async function getChatResponse(input: ChatInput): Promise<ChatResponse> {
       try {
         // push 到 Redis unextracted
         await pushUnextractedMessages(
-          self.userId,
+          platform, platformId,
           `用户: ${currentMessageText}`,
           `Snow: ${fullResponse}`,
         );
 
         // 检查是否触发轮次提取
-        const length = await getUnextractedLength(self.userId);
+        const length = await getUnextractedLength(platform, platformId);
         if (length >= EXTRACT_EVERY_N_MESSAGES) {
-          await executeMemoryExtraction(self.userId);
+          await executeMemoryExtraction(userIdentifier);
         }
 
         // 推延时任务（新的覆盖旧的）
-        scheduleDelayedExtraction(self.userId);
+        scheduleDelayedExtraction(userIdentifier);
       } catch (err) {
         console.error('[getChatResponse] 异步记忆处理失败:', err);
       }
@@ -203,6 +204,6 @@ export async function getChatResponse(input: ChatInput): Promise<ChatResponse> {
  */
 export async function finalizeSession(platformId: string, platform: string): Promise<void> {
   const identity = await resolveUserIdentity(platform, platformId);
-  cancelDelayedExtraction(identity.userId);
-  await executeDelayedExtraction(identity.userId);
+  cancelDelayedExtraction(platform, platformId);
+  await executeDelayedExtraction({ userId: identity.userId, platform, platformId });
 }

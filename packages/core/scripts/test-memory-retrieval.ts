@@ -13,7 +13,7 @@ import { createTestUser, cleanupTestUser } from './test-utils.js';
 async function test() {
   console.log('🧪 Batch 4 验证：记忆检索 + 跨会话记忆\n');
 
-  const { user, relation } = await createTestUser('memory_retrieval_test');
+  const { user, relation, platform, platformId } = await createTestUser('memory_retrieval_test');
   console.log('');
 
   try {
@@ -69,7 +69,7 @@ Snow: 你一定可以的，记得多喝水放松一下`;
     console.log('   - 对话摘要存在');
   } finally {
     console.log('\n--- 清理测试数据 ---\n');
-    await cleanupTestUser(user.id);
+    await cleanupTestUser(user.id, platform, platformId);
   }
 
   process.exit(0);

@@ -8,7 +8,7 @@
  */
 import { eq } from 'drizzle-orm';
 import { db } from '../src/db/client.js';
-import { redis } from '../src/db/redis.js';
+import { clearAllRedisKeys } from '../src/db/queries/redis-store.js';
 import {
   users,
   userRelations,
@@ -67,7 +67,7 @@ export async function createTestUser(
  * 清理测试用户及其所有关联数据（PG + Redis）
  * 按外键依赖顺序删除
  */
-export async function cleanupTestUser(userId: string) {
+export async function cleanupTestUser(userId: string, platform: string, platformId: string) {
   // 清理 PG 数据
   const df = await db.delete(factualMemories).where(eq(factualMemories.userId, userId)).returning({ id: factualMemories.id });
   const ds = await db.delete(semanticMemories).where(eq(semanticMemories.userId, userId)).returning({ id: semanticMemories.id });
@@ -78,16 +78,7 @@ export async function cleanupTestUser(userId: string) {
   const du = await db.delete(users).where(eq(users.id, userId)).returning({ id: users.id });
 
   // 清理 Redis 数据
-  const redisKeys = [
-    `snow:memory:unextracted:${userId}`,
-    `snow:memory:unextracted:${userId}:processing`,
-    `snow:memory:context_summary:${userId}`,
-    `snow:chat:summary:${userId}`,
-    `snow:chat:summarized_up_to:${userId}`,
-  ];
-  for (const key of redisKeys) {
-    await redis.del(key);
-  }
+  await clearAllRedisKeys(platform, platformId);
 
   console.log(`🗑️  已清理测试用户: ${df.length} 事实 + ${ds.length} 语义 + ${dc.length} 对话 + ${dr.length} 关系 + ${du.length} 用户 + Redis`);
 }
