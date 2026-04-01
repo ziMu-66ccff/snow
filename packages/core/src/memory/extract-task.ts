@@ -12,7 +12,7 @@
  * 4. 生成新的 context_summary → 更新 Redis
  */
 import { writeMemories } from './writer.js';
-import { compressContextSummary } from './summarizer.js';
+import { generateConversationSummary } from './summarizer.js';
 import {
   popAllUnextractedMessages,
   getMemoryContextSummary,
@@ -50,9 +50,9 @@ export async function executeMemoryExtraction(user: UserIdentifier): Promise<voi
   });
 
   // 4. 生成新的 context_summary → 更新 Redis
-  const newSummary = await compressContextSummary(
-    contextSummary ?? '',
+  const newSummary = await generateConversationSummary(
     newMessagesText,
+    contextSummary,
   );
   await setMemoryContextSummary(user.platform, user.platformId, newSummary);
 }
