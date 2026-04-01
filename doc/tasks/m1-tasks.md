@@ -250,9 +250,8 @@ Snow 对不同用户态度不同，对 zimu 最亲密。
 3. 编写关系层 Prompt 模板（5 个阶段 + 主人模式）
 4. 更新 Prompt Composer：注入关系层
 5. chat 脚本退出时调用关系更新
-6. **关系更新后清 Redis 身份缓存**（`snow:user:identity:{platform}:{platformId}`）
-   - 亲密度/阶段变更后，缓存里的旧值会导致 Snow 态度不变
-   - 只清 identity key，不清其他 key（unextracted/summary 等和关系无关）
+6. **关系更新后更新 Redis 身份缓存**（`snow:user:identity:{platform}:{platformId}`）
+   - 亲密度/阶段变更后，直接用新值更新 Redis 缓存（不是清除——新数据已在手，没必要多一次 DB 查询）
 
 ### 验证
 ```bash
