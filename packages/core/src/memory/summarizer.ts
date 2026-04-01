@@ -27,14 +27,25 @@ export async function generateConversationSummary(
 
   const { text: summary } = await generateText({
     model: getDeepSeekChat(),
-    prompt: `请简要概括以下对话的要点。
+    prompt: existingSummary
+      ? `请将以下旧总结和新对话合并为一段新的总结。
+要求：
+- 保留旧总结中的关键信息（不能丢弃）
+- 融入新对话中的新信息
+- 保留所有关键信息（人名、地点、事件、关系、偏好）
+- 保留情感基调和情绪变化
+- 去掉重复和无关紧要的内容
+- 控制在 ${maxLength} 字以内
+
+${toSummarize}`
+      : `请简要概括以下对话的要点。
 要求：
 - 保留所有关键信息（人名、地点、事件、关系、偏好）
 - 保留情感基调和情绪变化
 - 去掉重复和无关紧要的内容
 - 控制在 ${maxLength} 字以内
 
-${toSummarize}`,
+${content}`,
   });
 
   return summary;
