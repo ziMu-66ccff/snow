@@ -68,5 +68,5 @@ export async function compressContextSummary(
   }
 
   // 超长了，用通用摘要函数压缩
-  return generateConversationSummary(newContent, currentSummary, 200);
+  return generateConversationSummary(newContent, currentSummary, 400);
 }

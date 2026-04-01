@@ -76,16 +76,20 @@ export async function retrieveMemories(
   // - 非新会话：当前会话的上下文在 history 里（或被滑动窗口压缩过），
   //   Redis 里的 context_summary 是当前会话的记忆提取产生的，和 history 重叠。
   //   只需要从 PG 取更早的"上次对话"摘要。
-  // - 新会话：history 没有上下文，优先从 Redis 取（可能是刚结束还没持久化的上一段对话），
-  //   Redis 没有再从 PG 取。
+  // - 新会话：history 没有上下文，从 Redis 和 PG 都取：
+  //   · Redis 可能有刚结束还没持久化的上一段对话摘要
+  //   · PG 有更早的已持久化的对话摘要
+  //   · 两个都有时拼在一起，给 Snow 更完整的上下文
   let lastConversationSummary: string | undefined;
   if (isNewSession) {
     const redisSummary = await getMemoryContextSummary(platform, platformId);
-    if (redisSummary) {
-      lastConversationSummary = redisSummary;
+    const pgConvo = await getLastConversationSummary(userId);
+    const pgSummary = pgConvo?.summary ?? undefined;
+
+    if (redisSummary && pgSummary) {
+      lastConversationSummary = `${pgSummary}\n${redisSummary}`;
     } else {
-      const pgConvo = await getLastConversationSummary(userId);
-      lastConversationSummary = pgConvo?.summary ?? undefined;
+      lastConversationSummary = redisSummary ?? pgSummary;
     }
   } else {
     const pgConvo = await getLastConversationSummary(userId);
