@@ -30,11 +30,6 @@ async function test() {
   const stranger = await createTestUser('test_stranger');
   console.log('');
 
-  // 清理 identity 缓存（确保用测试数据）
-  const { clearAllRedisKeys } = await import('../src/db/queries/redis-store.js');
-  await clearAllRedisKeys(owner.platform, owner.platformId);
-  await clearAllRedisKeys(stranger.platform, stranger.platformId);
-
   try {
     // 测试 1：主人模式 — 问候
     console.log('--- 测试 1：主人模式 — 问候 ---');
@@ -79,13 +74,19 @@ async function test() {
     console.log('   - 冒充防护：不轻信自称主人的陌生人');
     console.log('   - 人设：有性格、有 emoji、不承认是 AI');
   } finally {
+    // 等待 onFinish 异步操作完成（push Redis、延时任务等）
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
     console.log('\n--- 清理测试数据 ---\n');
+
+    // 取消延时任务（防止 30 分钟后又写数据）
+    const { cancelDelayedExtraction } = await import('../src/memory/delayed-task.js');
+    cancelDelayedExtraction(owner.platform, owner.platformId);
+    cancelDelayedExtraction(stranger.platform, stranger.platformId);
+
+    // 清理 PG 数据
     await cleanupTestUser(owner.user.id, owner.platform, owner.platformId);
     await cleanupTestUser(stranger.user.id, stranger.platform, stranger.platformId);
-    // 清理 identity 缓存
-    const { clearAllRedisKeys } = await import('../src/db/queries/redis-store.js');
-    await clearAllRedisKeys(owner.platform, owner.platformId);
-    await clearAllRedisKeys(stranger.platform, stranger.platformId);
   }
 
   process.exit(0);
