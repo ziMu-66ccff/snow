@@ -23,6 +23,7 @@ doc/
 │       ├── README.md                  ← 模块索引
 │       ├── prompt-composer.md         ← Prompt 编排引擎
 │       ├── memory-system.md           ← 记忆系统
+│       ├── relation-system.md         ← 关系系统
 │       ├── emotion-engine.md          ← 情绪系统
 │       ├── database-schema.md         ← 数据模型
 │       ├── proactive-messaging.md     ← 主动消息系统（M2+）
@@ -35,7 +36,8 @@ doc/
     ├── batch1-report.md               ← Batch 1 完成报告
     ├── batch2-report.md               ← Batch 2 完成报告
     ├── batch3-report.md               ← Batch 3 完成报告
-    └── batch4-report.md               ← Batch 4 完成报告
+    ├── batch4-report.md               ← Batch 4 完成报告
+    └── batch5-report.md               ← Batch 5 完成报告
 ```
 
 项目代码结构详见 [m1-tasks.md](tasks/m1-tasks.md)。
