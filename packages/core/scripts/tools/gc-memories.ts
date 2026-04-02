@@ -6,7 +6,7 @@
 import { config } from 'dotenv';
 config({ path: '.env.local' });
 
-import { gcAllMemories } from '../src/memory/gc.js';
+import { gcAllMemories } from '../../src/memory/gc.js';
 
 async function main() {
   console.log('🧹 开始记忆垃圾回收...\n');

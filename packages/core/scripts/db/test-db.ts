@@ -1,9 +1,9 @@
 import { config } from 'dotenv';
 config({ path: '.env.local' });
 
-import { db, client } from '../src/db/client.js';
-import { users, userRelations } from '../src/db/schema.js';
-import { redis } from '../src/db/redis.js';
+import { db, client } from '../../src/db/client.js';
+import { users, userRelations } from '../../src/db/schema.js';
+import { redis } from '../../src/db/redis.js';
 import { eq } from 'drizzle-orm';
 
 async function testDb() {

@@ -7,8 +7,8 @@
  * 2. 测试结束后删除所有数据（PG + Redis），避免污染数据库
  */
 import { eq } from 'drizzle-orm';
-import { db } from '../src/db/client.js';
-import { clearAllRedisKeys } from '../src/db/queries/redis-store.js';
+import { db } from '../../src/db/client.js';
+import { clearAllRedisKeys } from '../../src/db/queries/redis-store.js';
 import {
   users,
   userRelations,
@@ -17,7 +17,7 @@ import {
   conversations,
   personalityCustomizations,
   personalityAdjustments,
-} from '../src/db/schema.js';
+} from '../../src/db/schema.js';
 
 const TEST_PLATFORM = '__test__';
 

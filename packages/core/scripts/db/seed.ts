@@ -2,8 +2,8 @@ import { config } from 'dotenv';
 config({ path: '.env.local' });
 
 import { eq } from 'drizzle-orm';
-import { db, client } from '../src/db/client.js';
-import { users, userRelations } from '../src/db/schema.js';
+import { db, client } from '../../src/db/client.js';
+import { users, userRelations } from '../../src/db/schema.js';
 
 async function seed() {
   console.log('🌱 Seeding database...\n');

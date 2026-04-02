@@ -6,10 +6,10 @@ import { config } from 'dotenv';
 config({ path: '.env.local' });
 
 import { eq } from 'drizzle-orm';
-import { writeMemories } from '../src/memory/writer.js';
-import { getFactualMemoriesForUser } from '../src/db/queries/memory-write.js';
-import { db } from '../src/db/client.js';
-import { semanticMemories } from '../src/db/schema.js';
+import { writeMemories } from '../../src/memory/writer.js';
+import { getFactualMemoriesForUser } from '../../src/db/queries/memory-write.js';
+import { db } from '../../src/db/client.js';
+import { semanticMemories } from '../../src/db/schema.js';
 import { createTestUser, cleanupTestUser } from './test-utils.js';
 
 async function test() {

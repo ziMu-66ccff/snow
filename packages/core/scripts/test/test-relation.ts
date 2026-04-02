@@ -7,10 +7,10 @@ import { config } from 'dotenv';
 config({ path: '.env.local' });
 
 import { eq } from 'drizzle-orm';
-import { db } from '../src/db/client.js';
-import { userRelations } from '../src/db/schema.js';
-import { evaluateRelationSignals } from '../src/relation/evaluator.js';
-import { updateRelation } from '../src/relation/updater.js';
+import { db } from '../../src/db/client.js';
+import { userRelations } from '../../src/db/schema.js';
+import { evaluateRelationSignals } from '../../src/relation/evaluator.js';
+import { updateRelation } from '../../src/relation/updater.js';
 import { createTestUser, cleanupTestUser } from './test-utils.js';
 
 async function test() {

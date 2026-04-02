@@ -5,7 +5,7 @@
 import { config } from 'dotenv';
 config({ path: '.env.local' });
 
-import { getChatResponse } from '../src/ai/chat.js';
+import { getChatResponse } from '../../src/ai/chat.js';
 import { createTestUser, cleanupTestUser } from './test-utils.js';
 
 async function streamChat(platformId: string, platform: string, message: string): Promise<string> {

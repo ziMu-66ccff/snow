@@ -5,9 +5,9 @@
 import { config } from 'dotenv';
 config({ path: '.env.local' });
 
-import { writeMemories } from '../src/memory/writer.js';
-import { retrieveMemories } from '../src/memory/retriever.js';
-import { insertConversation } from '../src/db/queries/memory-read.js';
+import { writeMemories } from '../../src/memory/writer.js';
+import { retrieveMemories } from '../../src/memory/retriever.js';
+import { insertConversation } from '../../src/db/queries/memory-read.js';
 import { createTestUser, cleanupTestUser } from './test-utils.js';
 
 async function test() {

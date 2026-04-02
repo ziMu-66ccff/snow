@@ -10,14 +10,14 @@
   "scripts": {
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:seed": "tsx packages/core/scripts/seed.ts",
-    "script:test-db": "tsx packages/core/scripts/test-db.ts",
+    "db:seed": "tsx packages/core/scripts/db/seed.ts",
+    "db:test": "tsx packages/core/scripts/db/test-db.ts",
     "script:chat": "tsx packages/core/scripts/chat.ts",
-    "script:test-chat": "tsx packages/core/scripts/test-chat.ts",
-    "script:test-memory-write": "tsx packages/core/scripts/test-memory-write.ts",
-    "script:test-memory-retrieval": "tsx packages/core/scripts/test-memory-retrieval.ts",
-    "script:gc-memories": "tsx packages/core/scripts/gc-memories.ts",
-    "script:test-relation": "tsx packages/core/scripts/test-relation.ts"
+    "test:chat": "tsx packages/core/scripts/test/test-chat.ts",
+    "test:memory-write": "tsx packages/core/scripts/test/test-memory-write.ts",
+    "test:memory-retrieval": "tsx packages/core/scripts/test/test-memory-retrieval.ts",
+    "test:relation": "tsx packages/core/scripts/test/test-relation.ts",
+    "tool:gc": "tsx packages/core/scripts/tools/gc-memories.ts"
   },
   "devDependencies": {
     "dotenv": "^16.4.0",
