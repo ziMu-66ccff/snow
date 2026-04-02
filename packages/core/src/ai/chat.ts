@@ -16,8 +16,8 @@ import { composeSystemPrompt } from './prompts/composer.js';
 import { applySlidingWindow } from './sliding-window.js';
 import { messageToText } from './message-utils.js';
 import { retrieveMemories } from '../memory/retriever.js';
-import { executePeriodicTasks, executeIdleTasks } from '../memory/task-scheduler.js';
-import { scheduleDelayedExtraction, cancelDelayedExtraction } from '../memory/delayed-task.js';
+import { executePeriodicTasks, executeIdleTasks } from '../scheduler/task-scheduler.js';
+import { scheduleDelayedTask, cancelDelayedTask } from '../scheduler/delayed-task.js';
 import { db } from '../db/client.js';
 import { users, userRelations } from '../db/schema.js';
 import {
@@ -160,7 +160,7 @@ export async function getChatResponse(input: ChatInput): Promise<ReturnType<type
         }
 
         // 推延时任务（新的覆盖旧的）
-        scheduleDelayedExtraction(userIdentifier);
+        scheduleDelayedTask(userIdentifier);
       } catch (err) {
         console.error('[getChatResponse] 异步记忆处理失败:', err);
       }
@@ -180,6 +180,6 @@ export async function getChatResponse(input: ChatInput): Promise<ReturnType<type
  */
 export async function finalizeSession(platformId: string, platform: string): Promise<void> {
   const identity = await resolveUserIdentity(platform, platformId);
-  cancelDelayedExtraction(platform, platformId);
+  cancelDelayedTask(platform, platformId);
   await executeIdleTasks({ userId: identity.userId, platform, platformId });
 }

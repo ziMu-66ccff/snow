@@ -68,12 +68,14 @@ export interface UpdateResult {
  * @param platform - 平台
  * @param platformId - 平台用户 ID
  * @param conversationMessages - 对话文本（空字符串 = 仅做时间衰减）
+ * @param contextSummary - 对话背景摘要（帮助 LLM 理解上下文）
  */
 export async function updateRelation(
   userId: string,
   platform: string,
   platformId: string,
   conversationMessages: string,
+  contextSummary?: string,
 ): Promise<UpdateResult> {
   // 读当前关系
   const relation = await db.query.userRelations.findFirst({
@@ -115,7 +117,7 @@ export async function updateRelation(
 
   if (conversationMessages.length > 0) {
     // LLM 分析 4 维信号
-    const signals = await evaluateRelationSignals(conversationMessages);
+    const signals = await evaluateRelationSignals(conversationMessages, contextSummary);
 
     // 计算 timespan（代码算）
     const userRecord = await db.query.users.findFirst({

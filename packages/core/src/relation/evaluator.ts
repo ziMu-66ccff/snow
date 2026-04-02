@@ -27,18 +27,24 @@ export type RelationSignals = z.infer<typeof relationSignalsSchema>;
 /**
  * LLM 分析对话中的关系信号
  *
- * @param conversationMessages - 需要分析的对话文本（格式：用户: xxx\nSnow: xxx）
+ * @param conversationMessages - 需要分析的对话文本
+ * @param contextSummary - 之前的对话背景（帮助 LLM 理解上下文）
  * @returns 4 维信号增量
  */
 export async function evaluateRelationSignals(
   conversationMessages: string,
+  contextSummary?: string,
 ): Promise<RelationSignals> {
+  const contextSection = contextSummary
+    ? `## 之前的对话背景（仅供理解上下文）\n${contextSummary}\n\n`
+    : '';
+
   const { output } = await generateText({
     model: getDeepSeekChat(),
     output: Output.object({ schema: relationSignalsSchema }),
     prompt: `你是 Snow 的关系分析器。请分析以下对话中的关系信号。
 
-对话内容：
+${contextSection}## 需要分析的对话
 ${conversationMessages}
 
 请评估以下 4 个维度的变化（-1 到 1 之间的浮点数）：

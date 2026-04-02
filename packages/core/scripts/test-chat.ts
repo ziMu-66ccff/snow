@@ -80,9 +80,9 @@ async function test() {
     console.log('\n--- 清理测试数据 ---\n');
 
     // 取消延时任务（防止 30 分钟后又写数据）
-    const { cancelDelayedExtraction } = await import('../src/memory/delayed-task.js');
-    cancelDelayedExtraction(owner.platform, owner.platformId);
-    cancelDelayedExtraction(stranger.platform, stranger.platformId);
+    const { cancelDelayedTask } = await import('../src/scheduler/delayed-task.js');
+    cancelDelayedTask(owner.platform, owner.platformId);
+    cancelDelayedTask(stranger.platform, stranger.platformId);
 
     // 清理 PG 数据
     await cleanupTestUser(owner.user.id, owner.platform, owner.platformId);

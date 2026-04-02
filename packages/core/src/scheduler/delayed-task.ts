@@ -22,9 +22,9 @@ function timerKey(platform: string, platformId: string): string {
 /**
  * 推一个延时任务（新的覆盖旧的）
  *
- * 30 分钟后执行：提取剩余记忆 + 持久化摘要到 PG
+ * 30 分钟后执行空闲任务：记忆提取 + 关系评估 + 持久化摘要 + GC
  */
-export function scheduleDelayedExtraction(user: UserIdentifier): void {
+export function scheduleDelayedTask(user: UserIdentifier): void {
   const key = timerKey(user.platform, user.platformId);
 
   // 取消旧的
@@ -37,7 +37,7 @@ export function scheduleDelayedExtraction(user: UserIdentifier): void {
     try {
       await executeIdleTasks(user);
     } catch (err) {
-      console.error(`[delayed-task] 延时提取失败 (${key}):`, err);
+      console.error(`[delayed-task] 延时任务失败 (${key}):`, err);
     }
   }, DELAY_MS);
 
@@ -47,7 +47,7 @@ export function scheduleDelayedExtraction(user: UserIdentifier): void {
 /**
  * 取消延时任务（CLI 退出善后时调用）
  */
-export function cancelDelayedExtraction(platform: string, platformId: string): void {
+export function cancelDelayedTask(platform: string, platformId: string): void {
   const key = timerKey(platform, platformId);
   const existing = timers.get(key);
   if (existing) {
