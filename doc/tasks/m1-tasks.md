@@ -235,7 +235,7 @@ pnpm run script:chat --user=test_user
 
 ---
 
-## Batch 5：关系系统
+## Batch 5：关系系统 ✅ 已完成（2026-04-02）
 
 ### 目标
 Snow 对不同用户态度不同，对 zimu 最亲密。

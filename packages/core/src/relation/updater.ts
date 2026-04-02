@@ -6,7 +6,7 @@
  */
 import { eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { userRelations } from '../db/schema.js';
+import { users, userRelations } from '../db/schema.js';
 import { setCachedUserIdentity, getCachedUserIdentity } from '../db/queries/redis-store.js';
 import { evaluateRelationSignals } from './evaluator.js';
 
@@ -121,7 +121,7 @@ export async function updateRelation(
 
     // 计算 timespan（代码算）
     const userRecord = await db.query.users.findFirst({
-      where: eq(userRelations.userId, userId),
+      where: eq(users.id, userId),
       columns: { createdAt: true },
     });
     const timespanValue = userRecord
