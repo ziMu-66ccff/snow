@@ -43,7 +43,7 @@ function getOpenRouterProvider() {
   return _openrouter;
 }
 
-/** OpenAI text-embedding-3-small via OpenRouter — 记忆向量化（1536 维） */
+/** Qwen3 Embedding via OpenRouter — 记忆向量化（2560 维） */
 export function getEmbeddingModel(): EmbeddingModel {
-  return getOpenRouterProvider().embeddingModel('openai/text-embedding-3-small');
+  return getOpenRouterProvider().embeddingModel('qwen/qwen3-embedding-4b');
 }

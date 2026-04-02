@@ -98,7 +98,7 @@ export const semanticMemories = pgTable('semantic_memories', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').references(() => users.id).notNull(),
   content: text('content').notNull(),
-  embedding: vector('embedding', { dimensions: 1536 }),
+  embedding: vector('embedding', { dimensions: 2560 }),
   importance: real('importance').default(0.5).notNull(),
   emotionalIntensity: real('emotional_intensity').default(0).notNull(),
   topic: varchar('topic', { length: 128 }),
