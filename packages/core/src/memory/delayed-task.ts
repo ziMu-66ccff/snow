@@ -7,7 +7,7 @@
  * M1 实现：setTimeout（CLI 进程常驻）
  * M2 替换：Upstash QStash（Serverless HTTP 回调）
  */
-import { executeDelayedExtraction, type UserIdentifier } from './extract-task.js';
+import { executeIdleTasks, type UserIdentifier } from './task-scheduler.js';
 
 /** 延时时间：30 分钟 */
 const DELAY_MS = 30 * 60 * 1000;
@@ -35,7 +35,7 @@ export function scheduleDelayedExtraction(user: UserIdentifier): void {
   const timer = setTimeout(async () => {
     timers.delete(key);
     try {
-      await executeDelayedExtraction(user);
+      await executeIdleTasks(user);
     } catch (err) {
       console.error(`[delayed-task] 延时提取失败 (${key}):`, err);
     }

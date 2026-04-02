@@ -16,7 +16,7 @@ import { composeSystemPrompt } from './prompts/composer.js';
 import { applySlidingWindow } from './sliding-window.js';
 import { messageToText } from './message-utils.js';
 import { retrieveMemories } from '../memory/retriever.js';
-import { executeMemoryExtraction, executeDelayedExtraction } from '../memory/extract-task.js';
+import { executePeriodicTasks, executeIdleTasks } from '../memory/task-scheduler.js';
 import { scheduleDelayedExtraction, cancelDelayedExtraction } from '../memory/delayed-task.js';
 import { db } from '../db/client.js';
 import { users, userRelations } from '../db/schema.js';
@@ -153,10 +153,10 @@ export async function getChatResponse(input: ChatInput): Promise<ReturnType<type
           `Snow: ${text}`,
         );
 
-        // 检查是否触发轮次提取
+        // 检查是否触发周期性任务（记忆提取 + 关系评估）
         const length = await getUnextractedLength(platform, platformId);
         if (length >= EXTRACT_EVERY_N_MESSAGES) {
-          await executeMemoryExtraction(userIdentifier);
+          await executePeriodicTasks(userIdentifier);
         }
 
         // 推延时任务（新的覆盖旧的）
@@ -181,5 +181,5 @@ export async function getChatResponse(input: ChatInput): Promise<ReturnType<type
 export async function finalizeSession(platformId: string, platform: string): Promise<void> {
   const identity = await resolveUserIdentity(platform, platformId);
   cancelDelayedExtraction(platform, platformId);
-  await executeDelayedExtraction({ userId: identity.userId, platform, platformId });
+  await executeIdleTasks({ userId: identity.userId, platform, platformId });
 }

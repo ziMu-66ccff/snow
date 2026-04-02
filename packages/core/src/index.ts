@@ -27,5 +27,9 @@ export { writeMemories, type WriteMemoriesInput, type WriteMemoriesResult } from
 export { retrieveMemories, type RetrievedMemories } from './memory/retriever.js';
 export { memoryVividness } from './memory/vividness.js';
 export { generateConversationSummary } from './memory/summarizer.js';
-export { executeMemoryExtraction, executeDelayedExtraction } from './memory/extract-task.js';
+export { executePeriodicTasks, executeIdleTasks } from './memory/task-scheduler.js';
+
+// Relation
+export { evaluateRelationSignals } from './relation/evaluator.js';
+export { updateRelation } from './relation/updater.js';
 export { gcUserMemories, gcAllMemories } from './memory/gc.js';

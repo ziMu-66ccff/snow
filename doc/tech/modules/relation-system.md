@@ -193,20 +193,43 @@ intimacyScore >= 75 → intimate
 
 ## 七、执行流程
 
-```
-getChatResponse 的 onFinish 回调中：
+### 触发时机
 
-1. 记忆处理（已有）
-2. 关系更新（新增）：
-   a. owner 跳过（不评估）
-   b. LLM 分析对话 → 5 维信号增量
-   c. 计算时间衰减（距上次互动的衰减）
-   d. 更新五维分数（旧 + 增量 × 学习率）
-   e. 计算新亲密度（加权和 × 100）
-   f. 判定新阶段
-   g. 更新 PG user_relations
-   h. 更新 Redis 身份缓存（setCachedUserIdentity）
-   i. 更新 lastInteraction + interactionCount
+和记忆提取共用触发时机，共用数据源（Redis unextracted 队列）：
+
+| 触发条件 | 执行内容 |
+|---------|---------|
+| 每 5 轮（unextracted >= 10 条） | 提取记忆 + 评估关系 |
+| 延时 30 分钟 | 提取记忆 + 评估关系 + 持久化摘要 + GC |
+
+### 编排层
+
+```
+executePeriodicTasks(user, messages)    ← 每 5 轮触发
+  ├── extractMemories()                 ← 独立函数：记忆提取
+  └── evaluateAndUpdateRelation()       ← 独立函数：关系评估 + 更新
+
+executeIdleTasks(user, messages)        ← 延时 30 分钟触发
+  ├── extractMemories()
+  ├── evaluateAndUpdateRelation()
+  ├── 持久化摘要到 PG
+  └── GC
+```
+
+### 关系评估流程
+
+```
+evaluateAndUpdateRelation(userId, platform, platformId, messages):
+  1. 读 PG user_relations → role, 五维分数, intimacyScore, lastInteraction
+  2. owner? → 跳过（不评估）
+  3. 计算时间衰减（距 lastInteraction 的空闲降级）
+  4. LLM 分析对话 → 4 维信号增量
+  5. 计算 timespan（代码算，非 LLM）
+  6. 更新五维分数（旧 + 增量 × 学习率）
+  7. 计算新亲密度（加权和 × 100）
+  8. 判定新阶段
+  9. 写 PG user_relations
+  10. 更新 Redis 身份缓存（setCachedUserIdentity）
 ```
 
 ---
