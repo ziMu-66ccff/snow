@@ -76,7 +76,7 @@ async function main() {
 
   // Ctrl+C 退出：善后（提取剩余记忆 + 持久化摘要）
   rl.on('close', async () => {
-    console.log('\n\n   💭 正在保存记忆（需要几秒钟，请稍候）...');
+    console.log('\n\n   💭 正在保存记忆...');
     try {
       await finalizeSession(platformId, platform);
       console.log('   ✅ 记忆已保存');
