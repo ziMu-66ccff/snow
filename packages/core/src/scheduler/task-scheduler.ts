@@ -12,7 +12,7 @@ import {
   popAllUnextractedMessages,
   getMemoryContextSummary,
 } from '../db/queries/redis-store.js';
-import { extractMemories } from '../memory/extract.js';
+import { runMemoryExtraction } from '../memory/extract.js';
 import { persistContextSummary } from '../memory/persist-summary.js';
 import { gcUserMemories } from '../memory/gc.js';
 import { updateRelation } from '../relation/updater.js';
@@ -38,7 +38,7 @@ export async function executePeriodicTasks(user: UserIdentifier): Promise<void> 
   const contextSummary = await getMemoryContextSummary(user.platform, user.platformId) ?? undefined;
 
   // 记忆提取
-  await extractMemories(user.userId, user.platform, user.platformId, messagesText, contextSummary);
+  await runMemoryExtraction(user.userId, user.platform, user.platformId, messagesText, contextSummary);
 
   // 关系评估（失败不影响记忆提取）
   try {
@@ -63,7 +63,7 @@ export async function executeIdleTasks(user: UserIdentifier): Promise<void> {
 
   // 记忆提取（如果有新消息）
   if (messages.length > 0) {
-    await extractMemories(user.userId, user.platform, user.platformId, messagesText, contextSummary);
+    await runMemoryExtraction(user.userId, user.platform, user.platformId, messagesText, contextSummary);
   }
 
   // 关系评估（即使没有新消息，也做时间衰减）

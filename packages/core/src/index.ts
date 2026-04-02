@@ -27,7 +27,7 @@ export { writeMemories, type WriteMemoriesInput, type WriteMemoriesResult } from
 export { retrieveMemories, type RetrievedMemories } from './memory/retriever.js';
 export { memoryVividness } from './memory/vividness.js';
 export { generateConversationSummary } from './memory/summarizer.js';
-export { extractMemories as runMemoryExtraction } from './memory/extract.js';
+export { runMemoryExtraction } from './memory/extract.js';
 
 // Scheduler
 export { executePeriodicTasks, executeIdleTasks } from './scheduler/task-scheduler.js';

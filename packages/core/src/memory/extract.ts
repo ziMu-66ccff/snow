@@ -6,7 +6,7 @@
  */
 import { writeMemories } from './writer.js';
 import { generateConversationSummary } from './summarizer.js';
-import { getMemoryContextSummary, setMemoryContextSummary } from '../db/queries/redis-store.js';
+import { setMemoryContextSummary } from '../db/queries/redis-store.js';
 
 /**
  * 执行一次增量记忆提取
@@ -17,7 +17,7 @@ import { getMemoryContextSummary, setMemoryContextSummary } from '../db/queries/
  * @param messagesText - 需要提取的对话文本
  * @param contextSummary - 之前的上下文摘要（可选）
  */
-export async function extractMemories(
+export async function runMemoryExtraction(
   userId: string,
   platform: string,
   platformId: string,
