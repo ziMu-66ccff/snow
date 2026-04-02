@@ -235,10 +235,9 @@ LIMIT 5;
 | `id` | UUID | PK, 自动生成 | 对话唯一标识 |
 | `user_id` | UUID | FK → users.id, NOT NULL | 关联用户 |
 | `platform` | VARCHAR(64) | NOT NULL | 对话发生的平台 |
-| `started_at` | TIMESTAMP | NOT NULL, 默认 NOW | 对话开始时间 |
-| `ended_at` | TIMESTAMP | 可空 | 对话结束时间（进行中的对话为 NULL） |
 | `summary` | TEXT | 可空 | LLM 生成的对话摘要，如"聊了工作压力和下周面试的事" |
 | `emotion_snapshot` | JSONB | 可空 | 对话结束时 Snow 的情绪快照，如 `{ "primary": "caring", "intensity": 0.7 }` |
+| `created_at` | TIMESTAMP | NOT NULL, 默认 NOW | 记录时间 |
 
 **索引**：
 - `INDEX(user_id)` — 按用户查询对话历史

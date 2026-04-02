@@ -27,8 +27,11 @@ snow/
 │   │   │   ├── emotion/       ← 情绪系统
 │   │   │   │   └── engine.ts         情绪计算
 │   │   │   ├── relation/      ← 关系系统
-│   │   │   │   ├── evaluator.ts      关系信号分析
+│   │   │   │   ├── evaluator.ts      关系信号分析（LLM）
 │   │   │   │   └── updater.ts        关系分数更新
+│   │   │   ├── scheduler/     ← 跨模块任务编排
+│   │   │   │   ├── task-scheduler.ts 周期/空闲任务编排
+│   │   │   │   └── delayed-task.ts   延时任务管理
 │   │   │   ├── db/            ← 数据访问层（共享）
 │   │   │   │   ├── schema.ts         Drizzle 表结构定义
 │   │   │   │   ├── client.ts         数据库连接
