@@ -8,7 +8,7 @@
  */
 import { generateText } from 'ai';
 import { getDeepSeekChat } from '../ai/models.js';
-import { buildFirstSummaryPrompt, buildMergeSummaryPrompt } from '../prompts/conversation-summary.js';
+import { buildConversationSummaryPrompt } from '../prompts/conversation-summary.js';
 
 /**
  * 生成对话摘要
@@ -22,13 +22,9 @@ export async function generateConversationSummary(
   existingSummary?: string,
   maxLength: number = 200,
 ): Promise<string> {
-  const prompt = existingSummary
-    ? buildMergeSummaryPrompt(content, existingSummary, maxLength)
-    : buildFirstSummaryPrompt(content, maxLength);
-
   const { text: summary } = await generateText({
     model: getDeepSeekChat(),
-    prompt,
+    prompt: buildConversationSummaryPrompt(content, maxLength, existingSummary),
   });
 
   return summary;
