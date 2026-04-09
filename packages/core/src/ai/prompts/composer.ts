@@ -27,6 +27,7 @@ export interface PromptComposerContext {
   // Batch 6: 情绪层
   emotionPrimary?: string;
   emotionIntensity?: number;
+  emotionTrendSummary?: string;
 
   // Batch 4: 记忆层
   basicFacts?: string;
@@ -65,7 +66,11 @@ export function composeSystemPrompt(ctx: PromptComposerContext): string {
 
   // 情绪层（Batch 6 启用）
   if (ctx.emotionPrimary) {
-    layers.push(buildEmotionLayerPrompt(ctx.emotionPrimary, ctx.emotionIntensity ?? 0.5));
+    layers.push(buildEmotionLayerPrompt(
+      ctx.emotionPrimary,
+      ctx.emotionIntensity ?? 0.5,
+      ctx.emotionTrendSummary,
+    ));
   }
 
   // 记忆层（Batch 4 启用）

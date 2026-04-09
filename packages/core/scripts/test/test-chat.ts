@@ -80,7 +80,7 @@ async function test() {
     console.log('\n--- 清理测试数据 ---\n');
 
     // 取消延时任务（防止 30 分钟后又写数据）
-    const { cancelDelayedTask } = await import('../src/scheduler/delayed-task.js');
+    const { cancelDelayedTask } = await import('../../src/scheduler/delayed-task.js');
     cancelDelayedTask(owner.platform, owner.platformId);
     cancelDelayedTask(stranger.platform, stranger.platformId);
 

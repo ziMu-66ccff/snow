@@ -137,7 +137,7 @@ Snow 能说话了，有性格，通过命令行交互式聊天。
 1. 安装 AI 依赖：ai、@ai-sdk/deepseek
 2. 实现模型注册（`core/src/ai/models.ts`）
    - DeepSeek V3 作为主力模型
-   - DeepSeek Embedding
+   - OpenRouter `baai/bge-m3`（Embedding，1024 维）
 3. 编写基础人设 Prompt 模板（`core/src/ai/prompts/base-persona.ts`）
    - Layer 1 完整模板（从 prompt-composer.md 复制）
 4. 实现 Prompt 编排引擎 v1（`core/src/ai/prompt-composer.ts`）
@@ -175,7 +175,7 @@ pnpm run script:chat
 1. 实现记忆提取器（`core/src/memory/extractor.ts`）
    - 用 AI SDK `generateObject` + zod schema
    - 提取事实记忆（facts）+ 语义印象（impressions）+ 更新（updates）
-2. 实现 DeepSeek Embedding 调用
+2. 实现 Embedding 调用（OpenRouter `baai/bge-m3`）
 3. 实现记忆写入（`core/src/memory/writer.ts`）
    - 事实记忆：UPSERT（同 key 覆盖）
    - 语义记忆：向量化 → INSERT（含 embedding）
@@ -272,19 +272,23 @@ pnpm run script:chat --user=new_user
 
 ---
 
-## Batch 6：情绪系统
+## Batch 6：情绪系统 ✅ 已完成（2026-04-09）
 
 ### 目标
 Snow 有情绪，影响说话方式。
 
 ### 任务
 1. 实现情绪引擎（`core/src/emotion/engine.ts`）
-   - 基于对话内容 + 当前状态计算新情绪
-   - EMA 平滑
-2. Redis 情绪状态读写
-3. 编写情绪层 Prompt 模板（7 种情绪指引）
-4. 更新 Prompt Composer：注入情绪层
-5. 对话中实时更新情绪
+   - 基于当前消息 + 热上下文（`context_summary + unextracted`）+ 当前状态计算新情绪
+   - EMA 平滑 + 强事件突变
+2. Redis 情绪状态读写（`snow:emotion:state:{platform}:{platformId}`）
+3. 30 分钟 idle 时持久化情绪快照到 `emotion_states`
+4. 会话结束后异步生成情绪趋势摘要（1-2 句）
+5. 编写情绪层 Prompt 模板（当前情绪 + 趋势摘要）
+6. 更新 Prompt Composer：注入情绪层
+7. 对话中实时更新情绪
+8. 新增 `emotion_trends` 冷数据表，保存会话结束后的情绪趋势摘要
+9. 在 idle 任务中持久化情绪快照与趋势摘要
 
 ### 验证
 ```bash
@@ -294,9 +298,13 @@ pnpm run script:chat --user=zimu
 # > 算了不说了 面试过了！！
 # Snow: 真的吗！太好了！✨🎉（开心语气）
 
-pnpm run script:test-emotion --user=zimu
-# ✅ 当前情绪: { primary: "happy", intensity: 0.8 }
+pnpm run test:emotion
+# ✅ 当前情绪随消息变化
+# ✅ Redis 热状态更新成功
+# ✅ 会话结束后可从 emotion_states 恢复
+# ✅ 会话结束后生成 emotion_trends 趋势摘要
 ```
+**确认**：情绪状态实时参与当前轮回复，跨会话可恢复，并具备趋势延续。
 
 ---
 

@@ -10,7 +10,7 @@
 
 ## 一、总览
 
-Snow M1 共 8 张核心表，围绕"记忆驱动一切"的架构理念设计：
+Snow M1 共 9 张核心表，围绕"记忆驱动一切"的架构理念设计：
 
 ```
 ┌─────────────────────────────────────────────────┐
@@ -29,7 +29,8 @@ Snow M1 共 8 张核心表，围绕"记忆驱动一切"的架构理念设计：
          ▼        ▼        ▼
    ┌──────────────────────────┐
    │     conversations        │  ← 对话记录 + 摘要
-   │     emotion_states       │  ← 情绪变化历史
+   │     emotion_states       │  ← 情绪变化历史 + 冷恢复基线
+   │     emotion_trends       │  ← 情绪趋势摘要（冷数据）
    └──────────────────────────┘
 ```
 
@@ -42,7 +43,8 @@ Snow M1 共 8 张核心表，围绕"记忆驱动一切"的架构理念设计：
 | `factual_memories` | 结构化事实记忆（key-value） | 几十~几百条 |
 | `semantic_memories` | 向量化语义记忆（参与语义搜索） | 几十~几千条 |
 | `conversations` | 对话记录 + LLM 摘要 | 每次对话 1 条 |
-| `emotion_states` | 情绪状态变化历史 | 每次情绪变化 1 条 |
+| `emotion_states` | 情绪状态变化历史 + 冷恢复基线 | 每次显著变化 / 会话结束 1 条 |
+| `emotion_trends` | 情绪趋势摘要（冷数据） | 1 条 |
 
 ---
 
@@ -130,7 +132,6 @@ Snow M1 共 8 张核心表，围绕"记忆驱动一切"的架构理念设计：
 | `signal_timespan` | REAL | NOT NULL, 默认 0 | 信号维度 5：时间跨度（0-1） |
 | `interaction_count` | INTEGER | NOT NULL, 默认 0 | 累计互动次数 |
 | `last_interaction` | TIMESTAMP | 可空 | 最后一次互动时间（用于时间衰减计算） |
-| `emotion_trend` | VARCHAR(64) | 可空 | 近期情绪趋势（如 `positive` / `negative` / `neutral`） |
 | `topics` | TEXT[] | 可空 | 用户常聊话题标签（如 `['工作', '游戏', '感情']`） |
 | `updated_at` | TIMESTAMP | NOT NULL, 默认 NOW | 最后更新时间 |
 
@@ -236,7 +237,6 @@ LIMIT 5;
 | `user_id` | UUID | FK → users.id, NOT NULL | 关联用户 |
 | `platform` | VARCHAR(64) | NOT NULL | 对话发生的平台 |
 | `summary` | TEXT | 可空 | LLM 生成的对话摘要，如"聊了工作压力和下周面试的事" |
-| `emotion_snapshot` | JSONB | 可空 | 对话结束时 Snow 的情绪快照，如 `{ "primary": "caring", "intensity": 0.7 }` |
 | `created_at` | TIMESTAMP | NOT NULL, 默认 NOW | 记录时间 |
 
 **索引**：
@@ -252,14 +252,14 @@ LIMIT 5;
 
 ### 2.8 emotion_states — 情绪状态历史表
 
-> Snow 的情绪变化时间线。每次情绪发生显著变化时记录一条。
+> Snow 的情绪变化时间线，同时也是 Redis 过期后的冷恢复基线。
 
 | 字段 | 类型 | 约束 | 说明 |
 |------|------|------|------|
 | `id` | UUID | PK, 自动生成 | — |
 | `user_id` | UUID | FK → users.id, NOT NULL | 关联用户（Snow 对不同用户有不同情绪） |
-| `primary_emotion` | VARCHAR(32) | NOT NULL | 主情绪：`happy` / `caring` / `sad` / `playful` / `worried` / `annoyed` / `calm` |
-| `secondary_emotion` | VARCHAR(32) | 可空 | 次情绪（混合情绪时使用） |
+| `primary_emotion` | VARCHAR(32) | NOT NULL | 主情绪：`happy` / `caring` / `sad` / `playful` / `worried` / `annoyed` / `missing` / `neutral` |
+| `secondary_emotion` | VARCHAR(32) | 可空 | 次情绪（M1 暂不使用，预留） |
 | `intensity` | REAL | NOT NULL | 情绪强度（0-1），0 = 几乎无感，1 = 极强 |
 | `trigger` | VARCHAR(256) | 可空 | 触发原因，如"用户说面试通过了" |
 | `created_at` | TIMESTAMP | NOT NULL, 默认 NOW | 记录时间 |
@@ -276,12 +276,36 @@ LIMIT 5;
 | `sad` | 难过 | 用户说了伤感的事、长时间不理她 |
 | `playful` | 俏皮 | 轻松的聊天氛围 |
 | `worried` | 担心 | 用户提到健康问题、压力大 |
-| `annoyed` | 轻微生气 | 用户说了不好的话 |
-| `calm` | 平静 | 默认状态 |
+| `annoyed` | 轻微生气 | 用户冒犯、失礼、越界 |
+| `missing` | 想念 | 久未互动、重逢时的牵挂 |
+| `neutral` | 平静 | 默认状态、最终回落点 |
 
 **业务说明**：
-- 这是历史记录表，不是当前状态——当前情绪状态存在 **Upstash Redis** 中（`emotion:{userId}`），读写更快
-- 历史记录用于情绪趋势分析（如"最近一周 Snow 对这个用户一直是 caring 状态"）
+- 这张表同时承担两种职责：
+- 1. 记录情绪显著变化历史
+- 2. 在 Redis 过期时，提供最近一次冷恢复基线
+- 会话结束（30 分钟 idle）时，应至少补一条情绪快照，保证跨会话恢复时有最新基线
+- 当前热状态优先存在 Redis，PG 是冷数据兜底
+- 详见 [emotion-engine.md](emotion-engine.md)
+
+---
+
+### 2.9 emotion_trends — 情绪趋势摘要表
+
+> Snow 对某个用户最近一段时间的情绪归纳。由 LLM 在会话结束时异步生成。
+
+| 字段 | 类型 | 约束 | 说明 |
+|------|------|------|------|
+| `id` | UUID | PK, 自动生成 | — |
+| `user_id` | UUID | FK → users.id, UNIQUE, NOT NULL | 关联用户，一对一 |
+| `summary` | TEXT | NOT NULL | 1-2 句趋势摘要，如“最近主要是关心和担心，情绪正在慢慢回落。” |
+| `dominant_emotion` | VARCHAR(32) | 可空 | 最近主导情绪，如 `caring` / `happy` |
+| `updated_at` | TIMESTAMP | NOT NULL, 默认 NOW | 最近更新时间 |
+
+**业务说明**：
+- 这是冷数据，用于 Redis 趋势摘要失效后的恢复
+- 不存原始流水，只存高度压缩后的结果
+- 当前轮 Prompt 注入时，优先读 Redis 热摘要，Redis miss 再读这张表
 - 详见 [emotion-engine.md](emotion-engine.md)
 
 ---
@@ -290,7 +314,7 @@ LIMIT 5;
 
 除了 PostgreSQL，Snow 还使用 Upstash Redis 存储**高频读写、临时性**的数据。
 
-所有 key 使用 `platform:platformId` 作为用户标识（可读、不依赖 DB 查询），统一 10 小时 TTL。
+所有 key 使用 `platform:platformId` 作为用户标识（可读、不依赖 DB 查询）。
 
 | Key 模式 | 值类型 | TTL | 用途 |
 |----------|--------|-----|------|
@@ -299,12 +323,14 @@ LIMIT 5;
 | `snow:memory:context_summary:{platform}:{platformId}` | String | 10h | 记忆提取的上下文摘要（已提取部分的 LLM 总结） |
 | `snow:chat:summary:{platform}:{platformId}` | String | 10h | 滑动窗口的对话总结（早期对话压缩后的摘要） |
 | `snow:chat:summarized_up_to:{platform}:{platformId}` | Number | 10h | 滑动窗口的总结覆盖到对话消息的第几条 |
-| `emotion:{userId}` | JSON | 24h | Snow 对该用户的**当前**情绪状态（Batch 6） |
+| `snow:emotion:state:{platform}:{platformId}` | JSON | 4h | Snow 对该用户的当前热情绪状态 |
+| `snow:emotion:trend:{platform}:{platformId}` | String | 4h | 最近一段时间的情绪趋势摘要（热缓存） |
 
 **为什么用 Redis 而不是都存 PG？**
 - 待提取消息队列每次对话都要 push，PG 延迟 5-50ms，Redis < 1ms
 - 上下文摘要是临时的，TTL 过期后从 PG 冷数据恢复
 - 用户身份在一次会话中不会变，缓存即可
+- 当前情绪属于快变量，适合放热缓存；Redis 过期后再从 `emotion_states` 恢复
 
 ---
 
@@ -323,7 +349,9 @@ users (1) ──── (1) personality_customizations
   │
   ├──── (N) conversations
   │
-  └──── (N) emotion_states
+  ├──── (N) emotion_states
+  │
+  └──── (1) emotion_trends
 ```
 
 所有表都通过 `user_id` 关联到 `users` 表。`users` 是**唯一的扇出点**，结构清晰简单。
@@ -336,7 +364,7 @@ users (1) ──── (1) personality_customizations
 
 | 差异点 | 旧文档 SQL | 实际代码（schema.ts） |
 |--------|-----------|---------------------|
-| 向量维度 | `VECTOR(1536)` | `VECTOR(1536)` — OpenAI text-embedding-3-small 默认维度 |
+| 向量维度 | `VECTOR(1536)` | `VECTOR(1024)` — 当前使用 `baai/bge-m3`（via OpenRouter） |
 | semantic_memories 字段 | 无 `emotional_intensity`、`topic` | ✅ 有，用于鲜活度计算和话题过滤 |
 | capabilities 表 | 已定义 | ❌ 未创建（M3+ 再加） |
 | HNSW 向量索引 | 已写 | ❌ 未创建（数据量小时不需要，全量扫描即可） |

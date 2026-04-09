@@ -8,13 +8,18 @@
  * - snow:user:*    — 用户身份缓存
  * - snow:memory:*  — 记忆提取相关
  * - snow:chat:*    — 滑动窗口相关
+ * - snow:emotion:* — 情绪状态与趋势
  *
- * 统一 TTL：10 小时
+ * TTL：
+ * - 默认：10 小时
+ * - emotion：4 小时
  */
 import { redis } from '../redis.js';
 
 /** 统一 TTL：10 小时（秒） */
 const TTL = 10 * 60 * 60;
+/** 情绪热状态 TTL：4 小时（秒） */
+const EMOTION_TTL = 4 * 60 * 60;
 
 /** 构造 Redis key 的用户标识部分 */
 function userKey(platform: string, platformId: string): string {
@@ -80,6 +85,18 @@ export async function popAllUnextractedMessages(platform: string, platformId: st
   return messages;
 }
 
+/** 查看尚未提取的最近消息（不清空） */
+export async function peekUnextractedMessages(
+  platform: string,
+  platformId: string,
+  limit: number = 10,
+): Promise<string[]> {
+  const key = `snow:memory:unextracted:${userKey(platform, platformId)}`;
+  const start = Math.max(-limit, -1000);
+  const messages = await redis.lrange(key, start, -1);
+  return messages.map(String);
+}
+
 // ============================================
 // 记忆提取：上下文总结
 // ============================================
@@ -121,6 +138,43 @@ export async function clearChatSummary(platform: string, platformId: string): Pr
 }
 
 // ============================================
+// 情绪：当前状态
+// ============================================
+
+export interface CachedEmotionState {
+  primary: string;
+  intensity: number;
+  lastUpdated: string;
+}
+
+export async function getCachedEmotionState(platform: string, platformId: string): Promise<CachedEmotionState | null> {
+  const data = await redis.get(`snow:emotion:state:${userKey(platform, platformId)}`);
+  if (!data) return null;
+  return typeof data === 'string' ? JSON.parse(data) : data as CachedEmotionState;
+}
+
+export async function setCachedEmotionState(
+  platform: string,
+  platformId: string,
+  state: CachedEmotionState,
+): Promise<void> {
+  await redis.set(`snow:emotion:state:${userKey(platform, platformId)}`, JSON.stringify(state), { ex: EMOTION_TTL });
+}
+
+// ============================================
+// 情绪：趋势摘要
+// ============================================
+
+export async function getCachedEmotionTrend(platform: string, platformId: string): Promise<string | null> {
+  const val = await redis.get(`snow:emotion:trend:${userKey(platform, platformId)}`);
+  return val ? String(val) : null;
+}
+
+export async function setCachedEmotionTrend(platform: string, platformId: string, summary: string): Promise<void> {
+  await redis.set(`snow:emotion:trend:${userKey(platform, platformId)}`, summary, { ex: EMOTION_TTL });
+}
+
+// ============================================
 // 清理全部 Redis key（测试用）
 // ============================================
 
@@ -133,6 +187,8 @@ export async function clearAllRedisKeys(platform: string, platformId: string): P
     `snow:memory:context_summary:${uk}`,
     `snow:chat:summary:${uk}`,
     `snow:chat:summarized_up_to:${uk}`,
+    `snow:emotion:state:${uk}`,
+    `snow:emotion:trend:${uk}`,
   ];
   for (const key of keys) {
     await redis.del(key);

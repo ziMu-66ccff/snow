@@ -43,7 +43,7 @@ function getOpenRouterProvider() {
   return _openrouter;
 }
 
-/** Qwen3 Embedding via OpenRouter — 记忆向量化（2560 维） */
+/** BAAI bge-m3 via OpenRouter — 记忆向量化（1024 维） */
 export function getEmbeddingModel(): EmbeddingModel {
-  return getOpenRouterProvider().embeddingModel('qwen/qwen3-embedding-4b');
+  return getOpenRouterProvider().embeddingModel('baai/bge-m3');
 }

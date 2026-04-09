@@ -16,6 +16,7 @@ import { composeSystemPrompt } from './prompts/composer.js';
 import { applySlidingWindow } from './sliding-window.js';
 import { messageToText } from './message-utils.js';
 import { retrieveMemories } from '../memory/retriever.js';
+import { updateEmotionState } from '../emotion/engine.js';
 import { executePeriodicTasks, executeIdleTasks } from '../scheduler/task-scheduler.js';
 import { scheduleDelayedTask, cancelDelayedTask } from '../scheduler/delayed-task.js';
 import { db } from '../db/client.js';
@@ -123,12 +124,24 @@ export async function getChatResponse(input: ChatInput): Promise<ReturnType<type
     isNewSession, platform, platformId,
   );
 
+  // 情绪系统：基于热上下文 + 当前消息计算当前轮情绪
+  const emotion = await updateEmotionState({
+    userId,
+    platform,
+    platformId,
+    intimacyScore,
+    currentMessage: currentMessageText,
+  });
+
   // 组装 Prompt
   const systemPrompt = composeSystemPrompt({
     userId,
     userName,
     relationRole: role,
     relationStage: stage,
+    emotionPrimary: emotion.state.primary,
+    emotionIntensity: emotion.state.intensity,
+    emotionTrendSummary: emotion.trendSummary,
     basicFacts: memories.basicFacts,
     lastConversationSummary: memories.lastConversationSummary,
     dynamicMemories: memories.dynamicMemories,

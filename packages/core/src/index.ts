@@ -36,3 +36,13 @@ export { executePeriodicTasks, executeIdleTasks } from './scheduler/task-schedul
 export { evaluateRelationSignals } from './relation/evaluator.js';
 export { updateRelation } from './relation/updater.js';
 export { gcUserMemories, gcAllMemories } from './memory/gc.js';
+
+// Emotion
+export {
+  getEmotionContext,
+  updateEmotionState,
+  persistEmotionSnapshot,
+  refreshEmotionTrendSummary,
+  type EmotionType,
+  type EmotionState,
+} from './emotion/engine.js';

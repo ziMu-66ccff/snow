@@ -16,6 +16,7 @@ import { runMemoryExtraction } from '../memory/extract.js';
 import { persistContextSummary } from '../memory/persist-summary.js';
 import { gcUserMemories } from '../memory/gc.js';
 import { updateRelation } from '../relation/updater.js';
+import { persistEmotionSnapshot, refreshEmotionTrendSummary } from '../emotion/engine.js';
 
 /** 用户标识：PG 查询需要 userId，Redis 查询需要 platform + platformId */
 export interface UserIdentifier {
@@ -53,6 +54,7 @@ export async function executePeriodicTasks(user: UserIdentifier): Promise<void> 
  * - 提取记忆
  * - 评估关系
  * - 持久化摘要到 PG
+ * - 持久化情绪快照 + 情绪趋势摘要
  * - GC
  */
 export async function executeIdleTasks(user: UserIdentifier): Promise<void> {
@@ -78,6 +80,14 @@ export async function executeIdleTasks(user: UserIdentifier): Promise<void> {
     await persistContextSummary(user.userId, user.platform, user.platformId);
   } catch (err) {
     console.error('[idle-tasks] 摘要持久化失败:', err);
+  }
+
+  // 持久化情绪快照 + 刷新趋势摘要
+  try {
+    await persistEmotionSnapshot(user);
+    await refreshEmotionTrendSummary(user);
+  } catch (err) {
+    console.error('[idle-tasks] 情绪持久化失败:', err);
   }
 
   // GC

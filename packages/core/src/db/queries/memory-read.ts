@@ -83,14 +83,12 @@ export async function insertConversation(params: {
   userId: string;
   platform: string;
   summary: string;
-  emotionSnapshot?: Record<string, unknown>;
 }) {
   const [inserted] = await db.insert(conversations)
     .values({
       userId: params.userId,
       platform: params.platform,
       summary: params.summary,
-      emotionSnapshot: params.emotionSnapshot,
     })
     .returning({ id: conversations.id });
 

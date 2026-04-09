@@ -68,7 +68,6 @@ export const userRelations = pgTable('user_relations', {
   signalTimespan: real('signal_timespan').default(0).notNull(),
   interactionCount: integer('interaction_count').default(0).notNull(),
   lastInteraction: timestamp('last_interaction'),
-  emotionTrend: varchar('emotion_trend', { length: 64 }),
   topics: text('topics').array(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -98,7 +97,7 @@ export const semanticMemories = pgTable('semantic_memories', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').references(() => users.id).notNull(),
   content: text('content').notNull(),
-  embedding: vector('embedding', { dimensions: 2560 }),
+  embedding: vector('embedding', { dimensions: 1024 }),
   importance: real('importance').default(0.5).notNull(),
   emotionalIntensity: real('emotional_intensity').default(0).notNull(),
   topic: varchar('topic', { length: 128 }),
@@ -116,7 +115,6 @@ export const conversations = pgTable('conversations', {
   userId: uuid('user_id').references(() => users.id).notNull(),
   platform: varchar('platform', { length: 64 }).notNull(),
   summary: text('summary'),
-  emotionSnapshot: jsonb('emotion_snapshot'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => [
   index('idx_conversations_user').on(table.userId),
@@ -135,4 +133,17 @@ export const emotionStates = pgTable('emotion_states', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => [
   index('idx_emotion_user_time').on(table.userId, table.createdAt),
+]);
+
+// ============================================
+// 情绪趋势摘要表（冷数据）
+// ============================================
+export const emotionTrends = pgTable('emotion_trends', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').references(() => users.id).notNull().unique(),
+  summary: text('summary').notNull(),
+  dominantEmotion: varchar('dominant_emotion', { length: 32 }),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => [
+  index('idx_emotion_trends_user').on(table.userId),
 ]);

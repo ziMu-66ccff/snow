@@ -4,6 +4,8 @@
 > 耗时：约 25 分钟  
 > 状态：✅ 全部验证通过
 
+> 说明（后续变更）：本报告记录的是 2026-03-31 当时实现。当前主分支已切换为 `baai/bge-m3`（1024 维）作为 embedding 模型，请以 `packages/core/src/ai/models.ts` 与 `packages/core/src/db/schema.ts` 为准。
+
 ---
 
 ## 目标

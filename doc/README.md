@@ -37,7 +37,8 @@ doc/
     ├── batch2-report.md               ← Batch 2 完成报告
     ├── batch3-report.md               ← Batch 3 完成报告
     ├── batch4-report.md               ← Batch 4 完成报告
-    └── batch5-report.md               ← Batch 5 完成报告
+    ├── batch5-report.md               ← Batch 5 完成报告
+    └── batch6-report.md               ← Batch 6 完成报告
 ```
 
 项目代码结构详见 [m1-tasks.md](tasks/m1-tasks.md)。
@@ -70,7 +71,7 @@ doc/
 
 | 文档 | 说明 | 状态 |
 |------|------|------|
-| [m1-tasks.md](tasks/m1-tasks.md) | M1 分批任务清单（7 Batch，命令行验证） | v0.2 执行中（Batch 1-4 ✅） |
+| [m1-tasks.md](tasks/m1-tasks.md) | M1 分批任务清单（7 Batch，命令行验证） | v0.2 执行中（Batch 1-6 ✅） |
 
 ---
 

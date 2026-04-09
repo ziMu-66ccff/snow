@@ -1,7 +1,7 @@
 # 记忆系统（Memory Engine）
 
 > 所属：核心基础设施 | 里程碑：M1  
-> 依赖：Supabase (PostgreSQL + pgvector) + Upstash Redis + DeepSeek Embedding  
+> 依赖：Supabase (PostgreSQL + pgvector) + Upstash Redis + OpenRouter `baai/bge-m3` Embedding（1024 维）  
 > 版本：v1.0  
 > 日期：2026-04-01
 

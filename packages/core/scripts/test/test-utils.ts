@@ -15,6 +15,8 @@ import {
   factualMemories,
   semanticMemories,
   conversations,
+  emotionStates,
+  emotionTrends,
   personalityCustomizations,
   personalityAdjustments,
 } from '../../src/db/schema.js';
@@ -72,6 +74,8 @@ export async function cleanupTestUser(userId: string, platform: string, platform
   const df = await db.delete(factualMemories).where(eq(factualMemories.userId, userId)).returning({ id: factualMemories.id });
   const ds = await db.delete(semanticMemories).where(eq(semanticMemories.userId, userId)).returning({ id: semanticMemories.id });
   const dc = await db.delete(conversations).where(eq(conversations.userId, userId)).returning({ id: conversations.id });
+  const de = await db.delete(emotionStates).where(eq(emotionStates.userId, userId)).returning({ id: emotionStates.id });
+  const det = await db.delete(emotionTrends).where(eq(emotionTrends.userId, userId)).returning({ id: emotionTrends.id });
   await db.delete(personalityAdjustments).where(eq(personalityAdjustments.userId, userId));
   await db.delete(personalityCustomizations).where(eq(personalityCustomizations.userId, userId));
   const dr = await db.delete(userRelations).where(eq(userRelations.userId, userId)).returning({ id: userRelations.id });
@@ -80,5 +84,5 @@ export async function cleanupTestUser(userId: string, platform: string, platform
   // 清理 Redis 数据
   await clearAllRedisKeys(platform, platformId);
 
-  console.log(`🗑️  已清理测试用户: ${df.length} 事实 + ${ds.length} 语义 + ${dc.length} 对话 + ${dr.length} 关系 + ${du.length} 用户 + Redis`);
+  console.log(`🗑️  已清理测试用户: ${df.length} 事实 + ${ds.length} 语义 + ${dc.length} 对话 + ${de.length} 情绪 + ${det.length} 趋势 + ${dr.length} 关系 + ${du.length} 用户 + Redis`);
 }
