@@ -17,8 +17,6 @@ import {
   conversations,
   emotionStates,
   emotionTrends,
-  personalityCustomizations,
-  personalityAdjustments,
 } from '../../src/db/schema.js';
 
 const TEST_PLATFORM = '__test__';
@@ -76,8 +74,6 @@ export async function cleanupTestUser(userId: string, platform: string, platform
   const dc = await db.delete(conversations).where(eq(conversations.userId, userId)).returning({ id: conversations.id });
   const de = await db.delete(emotionStates).where(eq(emotionStates.userId, userId)).returning({ id: emotionStates.id });
   const det = await db.delete(emotionTrends).where(eq(emotionTrends.userId, userId)).returning({ id: emotionTrends.id });
-  await db.delete(personalityAdjustments).where(eq(personalityAdjustments.userId, userId));
-  await db.delete(personalityCustomizations).where(eq(personalityCustomizations.userId, userId));
   const dr = await db.delete(userRelations).where(eq(userRelations.userId, userId)).returning({ id: userRelations.id });
   const du = await db.delete(users).where(eq(users.id, userId)).returning({ id: users.id });
 

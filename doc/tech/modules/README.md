@@ -17,6 +17,8 @@
 | [relation-system.md](relation-system.md) | 关系系统 | ✅ | 五维信号评估、亲密度计算、降级保护 |
 | [emotion-engine.md](emotion-engine.md) | 情绪系统 | ✅ | 情绪状态机、计算流程、EMA 平滑 |
 | [database-schema.md](database-schema.md) | 数据模型 | ✅ | 8 张核心表详细字段说明、Redis 缓存、ER 关系 |
+| [web-app.md](web-app.md) | Web 应用 | ❌ M2 | Next.js Web 壳、登录、聊天入口、Vercel 部署 |
+| [task-scheduler.md](task-scheduler.md) | 任务调度系统 | ❌ M2 | QStash 延时任务、覆盖逻辑、幂等、idle 回调 |
 | [proactive-messaging.md](proactive-messaging.md) | 主动消息系统 | ❌ M2+ | 调度架构、触发机制、频率控制 |
 | [capability-system.md](capability-system.md) | 能力系统 (MCP/Skill) | ❌ M3+ | 能力注册、路由、自发现 |
 | [message-gateway.md](message-gateway.md) | 统一消息网关 | ❌ M4+ | 多平台适配器、消息流转 |

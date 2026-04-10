@@ -33,12 +33,14 @@ doc/
 │
 └── tasks/                             ← 任务清单（分批执行）
     ├── m1-tasks.md                    ← M1 分批任务清单（7 Batch）
+    ├── m2-tasks.md                    ← M2 分批任务清单（Web / 调度 / 主动消息 / 图片）
     ├── batch1-report.md               ← Batch 1 完成报告
     ├── batch2-report.md               ← Batch 2 完成报告
     ├── batch3-report.md               ← Batch 3 完成报告
     ├── batch4-report.md               ← Batch 4 完成报告
     ├── batch5-report.md               ← Batch 5 完成报告
-    └── batch6-report.md               ← Batch 6 完成报告
+    ├── batch6-report.md               ← Batch 6 完成报告
+    └── batch7-report.md               ← Batch 7 完成报告
 ```
 
 项目代码结构详见 [m1-tasks.md](tasks/m1-tasks.md)。
@@ -71,7 +73,9 @@ doc/
 
 | 文档 | 说明 | 状态 |
 |------|------|------|
-| [m1-tasks.md](tasks/m1-tasks.md) | M1 分批任务清单（7 Batch，命令行验证） | v0.2 执行中（Batch 1-6 ✅） |
+| [m1-tasks.md](tasks/m1-tasks.md) | M1 分批任务清单（7 Batch，命令行验证） | v0.2 已完成（Batch 1-7 ✅） |
+| [m2-tasks.md](tasks/m2-tasks.md) | M2 分批任务清单（Web、延时队列、主动消息、图片） | v0.1 讨论中 |
+| [batch7-report.md](tasks/batch7-report.md) | Batch 7 完成报告：外部显式自定义 + 完整循环 | v0.1 最新 |
 
 ---
 

@@ -10,7 +10,7 @@
 
 ## 一、总览
 
-Snow M1 共 9 张核心表，围绕"记忆驱动一切"的架构理念设计：
+Snow M1 当前共 7 张核心表，围绕"记忆驱动一切"的架构理念设计：
 
 ```
 ┌─────────────────────────────────────────────────┐
@@ -19,12 +19,12 @@ Snow M1 共 9 张核心表，围绕"记忆驱动一切"的架构理念设计：
 └────────┬────────┬────────┬────────┬─────────────┘
          │        │        │        │
          ▼        ▼        ▼        ▼
-   ┌──────────┐ ┌────────┐ ┌──────┐ ┌───────────────────┐
-   │ factual  │ │semantic│ │user  │ │ personality       │
-   │ memories │ │memories│ │relat-│ │ customizations    │
-   │（事实记忆）│ │（语义记忆）│ │ions  │ │ + adjustments     │
-   └──────────┘ └────────┘ │（关系）│ │（性格自定义）        │
-                           └──────┘ └───────────────────┘
+   ┌──────────┐ ┌────────┐ ┌──────┐
+   │ factual  │ │semantic│ │user  │
+   │ memories │ │memories│ │relat-│
+   │（事实记忆）│ │（语义记忆）│ │ions  │
+   └──────────┘ └────────┘ │（关系）│
+                           └──────┘
          │        │        │
          ▼        ▼        ▼
    ┌──────────────────────────┐
@@ -37,8 +37,6 @@ Snow M1 共 9 张核心表，围绕"记忆驱动一切"的架构理念设计：
 | 表名 | 用途 | 记录量级（单用户） |
 |------|------|-------------------|
 | `users` | 用户身份 | 1 条 |
-| `personality_customizations` | 性格自定义配置 | 1 条 |
-| `personality_adjustments` | 聊天中的性格微调记录 | 几条~几十条 |
 | `user_relations` | 关系模型（亲密度 + 五维信号） | 1 条 |
 | `factual_memories` | 结构化事实记忆（key-value） | 几十~几百条 |
 | `semantic_memories` | 向量化语义记忆（参与语义搜索） | 几十~几千条 |
@@ -73,48 +71,24 @@ Snow M1 共 9 张核心表，围绕"记忆驱动一切"的架构理念设计：
 
 ---
 
-### 2.2 personality_customizations — 性格自定义表
+### 2.2 用户自定义人格（外部注入）
 
-> 用户通过设定面板 / 自然语言描述定制的 Snow 性格。每个用户最多一条。
+> M1 当前不在 core 数据库中持久化用户自定义人格。
 
-| 字段 | 类型 | 约束 | 说明 |
-|------|------|------|------|
-| `id` | UUID | PK, 自动生成 | — |
-| `user_id` | UUID | FK → users.id, UNIQUE, NOT NULL | 关联用户，一对一 |
-| `panel_description` | TEXT | 可空 | 用户在设定面板里写的原始描述，如"我希望她更活泼一些" |
-| `composed_directive` | TEXT | 可空 | LLM 综合面板描述 + 聊天调整后生成的**最终性格指令**，直接注入 System Prompt |
-| `created_at` | TIMESTAMP | NOT NULL, 默认 NOW | 创建时间 |
-| `updated_at` | TIMESTAMP | NOT NULL, 默认 NOW | 最后更新时间 |
+用户自定义人格采用**外部显式注入**方案：
+
+- 外界通过 `getChatResponse()` 传入 `customDirective`
+- core 只负责在 Prompt Composer 中按需注入 Layer 3
+- core 不负责自定义人格的存储、面板管理和聊天内自动学习
 
 **业务说明**：
-- `composed_directive` 是 Prompt Composer 读取的最终产物，一段自然语言
-- 每次面板保存或聊天调整后，后台用 LLM 重新综合生成此字段
+- 这样可以让 Web、管理后台或第三方平台自行决定配置来源
+- core 保持纯粹，只消费一段自然语言指令
 - 详见 [prompt-composer.md](prompt-composer.md) Layer 3 部分
 
 ---
 
-### 2.3 personality_adjustments — 聊天中的性格调整记录
-
-> 用户在日常聊天中随口说的性格偏好调整，如"你能不能少开我玩笑"。
-
-| 字段 | 类型 | 约束 | 说明 |
-|------|------|------|------|
-| `id` | UUID | PK, 自动生成 | — |
-| `user_id` | UUID | FK → users.id, NOT NULL | 关联用户 |
-| `original_text` | TEXT | NOT NULL | 用户原话，如"你说话能不能更直接一点" |
-| `summary` | TEXT | NOT NULL | LLM 提炼的摘要，如"用户希望 Snow 说话更直接" |
-| `active` | BOOLEAN | NOT NULL, 默认 true | 是否生效（用户可撤回） |
-| `created_at` | TIMESTAMP | NOT NULL, 默认 NOW | 记录时间 |
-
-**业务说明**：
-- 一个用户可以有多条调整记录，按时间排序
-- 矛盾的调整以最新为准，旧的自动 `active = false`
-- 聊天调整优先级 > 面板设定（更新鲜、更具体）
-- 这些记录会被综合进 `personality_customizations.composed_directive`
-
----
-
-### 2.4 user_relations — 关系模型表
+### 2.3 user_relations — 关系模型表
 
 > Snow 和每个用户的关系状态。核心表之一，决定了 Snow 对你说话的态度。
 
@@ -152,7 +126,7 @@ Snow M1 共 9 张核心表，围绕"记忆驱动一切"的架构理念设计：
 
 ---
 
-### 2.5 factual_memories — 事实记忆表
+### 2.4 factual_memories — 事实记忆表
 
 > Snow 记住的关于你的**确定性事实**。结构化 key-value 存储，精确检索。
 
@@ -189,7 +163,7 @@ Snow M1 共 9 张核心表，围绕"记忆驱动一切"的架构理念设计：
 
 ---
 
-### 2.6 semantic_memories — 语义记忆表
+### 2.5 semantic_memories — 语义记忆表
 
 > Snow 的**印象和感受**。向量化存储，支持语义搜索（"找到和当前话题相关的记忆"）。
 
@@ -337,11 +311,7 @@ LIMIT 5;
 ## 四、ER 关系图
 
 ```
-users (1) ──── (1) personality_customizations
-  │
-  ├──── (N) personality_adjustments
-  │
-  ├──── (1) user_relations
+users (1) ──── (1) user_relations
   │
   ├──── (N) factual_memories
   │

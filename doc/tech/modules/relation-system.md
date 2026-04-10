@@ -32,7 +32,7 @@
 | `intimate`（亲密） | 75-100 | 会说悄悄话，会吃醋，腹黑全开 |
 | `owner`（主人） | MAX | 硬编码最高级，zimu 专属 |
 
-关系层 Prompt 模板已在 `ai/prompts/composer.ts` 中实现（Batch 2），Batch 5 不需要改。
+关系层 Prompt 模板已在 `ai/composer.ts` 中实现（Batch 2），Batch 5 不需要改。
 
 ---
 

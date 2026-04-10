@@ -1,12 +1,13 @@
 /**
  * Prompt 编排引擎
  *
- * 组装最终 System Prompt：基础人设 + 关系层 + 自定义层 + 情绪层 + 记忆层
+ * 组装最终 System Prompt：基础人设 + 关系层 + 外部注入的自定义层 + 情绪层 + 记忆层
  * 所有 prompt 模板从 src/prompts/ 导入
  */
-import { getBasePersonaPrompt } from '../../prompts/base-persona.js';
-import { getRelationLayerPrompt } from '../../prompts/relation-layers.js';
-import { buildEmotionLayerPrompt } from '../../prompts/emotion-guidance.js';
+import { getBasePersonaPrompt } from '../prompts/base-persona.js';
+import { getExampleDialoguesPrompt } from '../prompts/example-dialogues.js';
+import { getRelationLayerPrompt } from '../prompts/relation-layers.js';
+import { buildEmotionLayerPrompt } from '../prompts/emotion-guidance.js';
 
 /**
  * Prompt 编排引擎上下文
@@ -21,7 +22,7 @@ export interface PromptComposerContext {
   relationStage?: string;  // stranger | familiar | trusted | intimate
   relationRole?: string;   // user | owner
 
-  // Batch 7: 用户自定义层
+  // Batch 7: 外部显式注入的用户自定义层
   composedDirective?: string;
 
   // Batch 6: 情绪层
@@ -59,7 +60,13 @@ export function composeSystemPrompt(ctx: PromptComposerContext): string {
     }
   }
 
-  // Layer 3: 用户自定义性格（Batch 7 启用）
+  // Few-shot 风格示例（按关系层选择）
+  layers.push(getExampleDialoguesPrompt(
+    ctx.relationRole ?? 'user',
+    ctx.relationStage ?? 'stranger',
+  ));
+
+  // Layer 3: 用户自定义性格（由 getChatResponse 外部显式传入）
   if (ctx.composedDirective) {
     layers.push(`## 用户个性化偏好\n\n${ctx.composedDirective}`);
   }

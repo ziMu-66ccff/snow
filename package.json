@@ -15,6 +15,7 @@
     "script:chat": "tsx packages/core/scripts/chat.ts",
     "test:chat": "tsx packages/core/scripts/test/test-chat.ts",
     "test:emotion": "tsx packages/core/scripts/test/test-emotion.ts",
+    "test:full-loop": "tsx packages/core/scripts/test/test-full-loop.ts",
     "test:memory-write": "tsx packages/core/scripts/test/test-memory-write.ts",
     "test:memory-retrieval": "tsx packages/core/scripts/test/test-memory-retrieval.ts",
     "test:relation": "tsx packages/core/scripts/test/test-relation.ts",

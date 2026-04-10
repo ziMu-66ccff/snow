@@ -11,8 +11,8 @@
  */
 import { streamText, type ModelMessage } from 'ai';
 import { eq, and } from 'drizzle-orm';
-import { getDeepSeekChat } from './models.js';
-import { composeSystemPrompt } from './prompts/composer.js';
+import { composeSystemPrompt } from './prompts-composer.js';
+import { getDeepSeekChat, getDeepSeekReasoner, getEuryale70B } from './models.js';
 import { applySlidingWindow } from './sliding-window.js';
 import { messageToText } from './message-utils.js';
 import { retrieveMemories } from '../memory/retriever.js';
@@ -37,6 +37,8 @@ export interface ChatInput {
   platform: string;
   /** 完整对话历史（含当前消息，对齐 AI SDK useChat 标准） */
   messages: ModelMessage[];
+  /** 外部显式注入的 Snow 自定义人格指令 */
+  customDirective?: string;
 }
 
 /**
@@ -97,7 +99,7 @@ async function resolveUserIdentity(platform: string, platformId: string): Promis
  * - Web 用 result.toUIMessageStreamResponse()
  */
 export async function getChatResponse(input: ChatInput): Promise<ReturnType<typeof streamText>> {
-  const { platformId, platform, messages } = input;
+  const { platformId, platform, messages, customDirective } = input;
 
   // ===== 阶段 1：用户身份 =====
   const identity = await resolveUserIdentity(platform, platformId);
@@ -130,6 +132,8 @@ export async function getChatResponse(input: ChatInput): Promise<ReturnType<type
     platform,
     platformId,
     intimacyScore,
+    relationRole: role,
+    relationStage: stage,
     currentMessage: currentMessageText,
   });
 
@@ -139,6 +143,7 @@ export async function getChatResponse(input: ChatInput): Promise<ReturnType<type
     userName,
     relationRole: role,
     relationStage: stage,
+    composedDirective: customDirective,
     emotionPrimary: emotion.state.primary,
     emotionIntensity: emotion.state.intensity,
     emotionTrendSummary: emotion.trendSummary,
@@ -148,7 +153,7 @@ export async function getChatResponse(input: ChatInput): Promise<ReturnType<type
   });
 
   // ===== 阶段 3：LLM 回复 =====
-  const model = getDeepSeekChat(); // 未来支持动态路由
+  const model = getDeepSeekChat();
   const userIdentifier = { userId, platform, platformId };
 
   const result = streamText({

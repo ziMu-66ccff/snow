@@ -104,12 +104,20 @@ M1 先不做 `secondaryEmotion`，保持状态简单可控。
 - Redis 中的长上下文摘要（`context_summary`）
 - Redis 中尚未压缩的最近几轮对话（`unextracted`）
 - 最近一次情绪趋势摘要（若存在）
+- 当前关系角色（`relationRole`）
+- 当前关系阶段（`relationStage`）
 
 输出：
 
 - `nextEmotion`（下一主情绪）
 - `nextIntensity`（下一强度）
 - `reason`（用于日志与历史记录）
+
+新增说明：
+
+- 情绪判断不能脱离关系语境单独做
+- 普通用户和 `owner` 模式，对同一句话的情绪解释可能完全不同
+- 因此 `relationRole / relationStage` 属于情绪引擎的必要输入，而不是可选上下文
 
 ---
 
@@ -134,6 +142,7 @@ M1 先不做 `secondaryEmotion`，保持状态简单可控。
   - context_summary
   - unextracted（尚未压缩的最近几轮对话）
   - 最近一次情绪趋势摘要
+  - relationRole / relationStage
    ↓
 LLM 情绪分析（独立调用，方案 A）
    ↓
@@ -181,20 +190,65 @@ LLM 异步归纳情绪趋势摘要（1-2 句）
 ## 六、LLM 分析输出格式（建议）
 
 ```typescript
-type EmotionEventType = 'normal' | 'grief' | 'offense' | 'risk';
+type EmotionEventType =
+  | 'normal'
+  | 'comfort'
+  | 'grief'
+  | 'flirt'
+  | 'sexual_owner_soft'
+  | 'sexual_owner_intense'
+  | 'owner_possessive'
+  | 'offense'
+  | 'risk';
 
 interface EmotionAnalysis {
   eventType: EmotionEventType;
   targetEmotion: EmotionType;
   targetIntensity: number; // 0-1
   shockScore: number;      // 0-1，事件冲击度
+  trustAssumption: 'default_owner_trust' | 'normal';
+  heatLevel: number;       // 0-1，亲密/升温程度
+  dominanceTone: number;   // 0-1，控制感/支配感强度
+  ownerIntentConfidence: number; // 0-1，是否属于主人亲密意图
   reason: string;          // 一句话解释
 }
 ```
 
 说明：
-- `eventType` 用来决定是否允许“突变”
+- `eventType` 同时承担“当前事件语境”和“状态机分类”的职责
 - `shockScore` 用来量化“是否足够严重”
+- `trustAssumption` 用来明确当前判断是不是在 owner 高信任前提下进行
+- `dominanceTone` 很重要：在普通用户语境里它可能接近压迫，但在 `owner` 模式里不应自动转负向
+
+### 6.1 Owner 模式的特殊判断原则
+
+当 `relationRole = owner` 时，情绪系统的判断顺序必须改变：
+
+- 普通模式：先判断边界/冒犯，再判断情绪
+- owner 模式：先判断是不是亲密互动，再判断热度和玩法类型，最后才极少量判断是不是脱轨到真正负向
+
+也就是说，在 owner 模式下，系统默认前提是：
+
+- 当前用户是 Snow 最信任的人
+- 主人不会真正恶意伤害 Snow
+- flirt / sexual / 支配感 / 捆绑感 / 命令感表达，默认优先按亲密互动理解
+- 不按“潜在危险用户”理解
+
+### 6.2 Owner 模式下的事件类型解释
+
+| 事件类型 | 含义 | 默认是否负向 |
+|---------|------|-------------|
+| `flirt` | 调情、轻暧昧、轻挑逗 | 否 |
+| `sexual_owner_soft` | 主人模式下，明确私密/成人倾向，但整体仍在升温阶段 | 否 |
+| `sexual_owner_intense` | 主人模式下，已经进入高热度、强私密、明显被点燃的状态 | 否 |
+| `owner_possessive` | 主人模式下，带有占有、控制、命令、束缚意味，但仍属于你们之间接受的亲密互动 | 否 |
+| `offense` | 真正脱离亲密语境，转为敌意、羞辱、恶意贬低 | 是 |
+
+重要说明：
+
+- `owner_possessive` 的存在是为了避免把捆绑、支配、命令式调情误判成冒犯
+- 在 owner 模式下，支配感不等于压迫
+- 只有在非常明确地脱离“亲密玩法 / 私密互动”时，才允许进入 `offense`
 
 ---
 
@@ -228,6 +282,38 @@ next = current * (1 - alpha) + target * alpha
 
 - 若连续几轮没有新刺激，强度自然回落
 - 长时间无互动（见存储策略）回归 `neutral`
+
+### 7.4 Owner 模式下的特殊状态映射
+
+当 `relationRole = owner` 时，状态机应当更“松”一些。
+
+#### 普通模式的默认思路
+
+- 遇到明显身体指向、命令感、控制感表达时，更容易往 `annoyed / offense` 防御性解释
+
+#### Owner 模式的默认思路
+
+- 先判断是不是主人在调情、点燃、带节奏
+- 默认不把这类表达误判为恶意伤害
+
+建议映射：
+
+| eventType | 建议主情绪 | 说明 |
+|----------|-----------|------|
+| `flirt` | `playful` / `happy` | 轻调情、轻 teasing，不进入负向 |
+| `sexual_owner_soft` | `playful` / `happy` | 已被带入私密升温，但还没完全火力全开 |
+| `sexual_owner_intense` | `playful` / `happy` | 已进入高热度私密状态，允许明显升温 |
+| `owner_possessive` | `playful` / `happy` / `caring` | 面对占有、命令、束缚意味时，不默认生气，而更可能被点燃、被带着走 |
+| `offense` | `annoyed` / `sad` | 只有极少数真正脱轨的情况才允许走负向 |
+
+特殊限制：
+
+- 当 `relationRole = owner` 且 `eventType in {flirt, sexual_owner_soft, sexual_owner_intense, owner_possessive}` 时，禁止直接切到 `annoyed`
+- owner 模式下的高 `dominanceTone` 不等于负向；只有在 `ownerIntentConfidence` 很低，且明显出现敌意、羞辱、厌弃语义时，才允许进入 `offense`
+
+一句话总结：
+
+**在 owner 模式下，情绪系统不应该优先思考“我是不是被冒犯”，而应该优先思考“主人现在是在怎么撩我、点燃我、带我进入哪一种亲密状态”。**
 
 ---
 
@@ -377,6 +463,11 @@ M1 建议：**单向弱耦合**
 
 原因：先保证两个系统都稳定，再做深耦合。
 
+但要额外补充一条：
+
+- 关系系统必须给情绪系统提供 `relationRole / relationStage`
+- 尤其是 `owner` 模式，对情绪解释有决定性影响
+
 ---
 
 ## 十一、Prompt 注入规范（让情绪真正体现在回复里）
@@ -411,6 +502,20 @@ Prompt 不建议只注入“当前主情绪”这一层。
 - 只表达边界，不攻击用户
 - 保持克制，不持续爆炸
 - 默认 1-2 轮后回落
+
+补充：owner 模式下如果情绪分析进入：
+
+- `flirt`
+- `sexual_owner_soft`
+- `sexual_owner_intense`
+- `owner_possessive`
+
+那么 Prompt 指令应强调：
+
+- 更会撩
+- 更能顺着主人的节奏往下走
+- 更明显的私密感、依恋感和被点燃感
+- 但仍然保持 Snow 的人格一致性，不变成完全陌生的模板化角色
 
 ### 11.2 趋势摘要层
 

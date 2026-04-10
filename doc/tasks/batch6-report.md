@@ -29,11 +29,11 @@
 | 文件 | 变更 |
 |------|------|
 | `packages/core/src/ai/chat.ts` | 在当前轮回复前接入情绪更新 |
-| `packages/core/src/ai/prompts/composer.ts` | 支持注入“当前情绪 + 趋势摘要” |
+| `packages/core/src/ai/composer.ts` | 支持注入“当前情绪 + 趋势摘要” |
 | `packages/core/src/prompts/emotion-guidance.ts` | 补充 `annoyed`，支持趋势摘要层 |
 | `packages/core/src/db/queries/redis-store.ts` | 新增 `snow:emotion:state:*` / `snow:emotion:trend:*` 读写 |
 | `packages/core/src/db/schema.ts` | 新增 `emotion_trends` 表 |
-| `packages/core/src/memory/persist-summary.ts` | 持久化对话摘要时同步写入情绪快照 |
+| `packages/core/src/memory/persist-summary.ts` | 持久化对话摘要到 `conversations` |
 | `packages/core/src/scheduler/task-scheduler.ts` | idle 任务增加情绪快照持久化与趋势摘要刷新 |
 | `packages/core/src/index.ts` | 导出情绪模块 API |
 | `packages/core/scripts/test/test-utils.ts` | 测试清理逻辑新增情绪相关表和 Redis key |
@@ -125,4 +125,3 @@ Batch 6 现在已经实现：
 ## 下一步
 
 Batch 7：用户自定义 + 完整循环。
-

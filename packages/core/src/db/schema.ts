@@ -6,7 +6,6 @@ import {
   timestamp,
   real,
   integer,
-  boolean,
   jsonb,
   uniqueIndex,
   index,
@@ -27,30 +26,6 @@ export const users = pgTable('users', {
 }, (table) => [
   uniqueIndex('uq_users_platform').on(table.platformId, table.platform),
 ]);
-
-// ============================================
-// 用户性格自定义表（自然语言驱动）
-// ============================================
-export const personalityCustomizations = pgTable('personality_customizations', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').references(() => users.id).notNull().unique(),
-  panelDescription: text('panel_description'),
-  composedDirective: text('composed_directive'),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
-
-// ============================================
-// 聊天中的性格调整记录
-// ============================================
-export const personalityAdjustments = pgTable('personality_adjustments', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').references(() => users.id).notNull(),
-  originalText: text('original_text').notNull(),
-  summary: text('summary').notNull(),
-  active: boolean('active').default(true).notNull(),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-});
 
 // ============================================
 // 关系模型表（多维评估）

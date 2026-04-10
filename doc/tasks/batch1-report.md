@@ -3,6 +3,7 @@
 > 日期：2026-03-30  
 > 耗时：约 15 分钟  
 > 状态：✅ 全部验证通过
+> 说明：本报告反映 Batch 1 当时的初始 schema。当前 M1 代码已移除 `personality_customizations` / `personality_adjustments`，请以最新 `schema.ts` 和 `database-schema.md` 为准。
 
 ---
 

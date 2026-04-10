@@ -242,6 +242,7 @@ const PROTECTED = [
 const response = await getChatResponse({
   platformId: 'zimu',
   platform: 'system',
+  customDirective: '和我说话可以更放松一点。',
   messages,  // 完整对话历史，含当前消息（对齐 AI SDK useChat 标准）
 });
 ```

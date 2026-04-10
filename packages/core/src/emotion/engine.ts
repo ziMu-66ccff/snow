@@ -44,10 +44,24 @@ const emotionTypeSchema = z.enum([
 ]);
 
 const emotionAnalysisSchema = z.object({
-  eventType: z.enum(['normal', 'grief', 'offense', 'risk']),
+  eventType: z.enum([
+    'normal',
+    'comfort',
+    'grief',
+    'flirt',
+    'sexual_owner_soft',
+    'sexual_owner_intense',
+    'owner_possessive',
+    'offense',
+    'risk',
+  ]),
   targetEmotion: emotionTypeSchema,
   targetIntensity: z.number().min(0).max(1),
   shockScore: z.number().min(0).max(1),
+  trustAssumption: z.enum(['default_owner_trust', 'normal']),
+  heatLevel: z.number().min(0).max(1),
+  dominanceTone: z.number().min(0).max(1),
+  ownerIntentConfidence: z.number().min(0).max(1),
   reason: z.string().min(1).max(120),
 });
 
@@ -65,6 +79,8 @@ export interface EmotionContext {
   contextSummary?: string;
   unextractedMessages: string[];
 }
+
+export type EmotionAnalysis = z.infer<typeof emotionAnalysisSchema>;
 
 const DEFAULT_EMOTION_STATE: EmotionState = {
   primary: 'neutral',
@@ -195,6 +211,96 @@ function shouldWriteSnapshot(previous: EmotionState, next: EmotionState, shockSc
 }
 
 /**
+ * 判断某个事件是否属于 owner 模式下的私密正向事件。
+ *
+ * 这些事件在主人模式里不应被按“被冒犯”处理，而应被视为：
+ * - 调情
+ * - 升温
+ * - 被点燃
+ * - 带支配感但仍在亲密语境中的互动
+ *
+ * @param eventType - 结构化输出里的事件类型
+ * @returns 是否属于 owner 模式下的正向私密事件
+ */
+function isOwnerPositiveEvent(eventType: EmotionAnalysis['eventType']): boolean {
+  return [
+    'flirt',
+    'sexual_owner_soft',
+    'sexual_owner_intense',
+    'owner_possessive',
+  ].includes(eventType);
+}
+
+/**
+ * 在 owner 模式下，对 LLM 的结构化结果做规则纠偏。
+ *
+ * 这里不再读取原始消息，也不做关键词猜测，只依据结构化字段判断：
+ * - owner 默认高信任
+ * - owner 的 flirt / sexual / dominance 语境不应轻易落到 offense
+ *
+ * @param analysis - LLM 原始分析结果
+ * @param relationRole - 当前关系角色
+ * @returns 后处理后的分析结果
+ */
+function postProcessAnalysis(
+  analysis: EmotionAnalysis,
+  relationRole: string | undefined,
+): EmotionAnalysis {
+  if (relationRole !== 'owner') return analysis;
+
+  if (analysis.eventType !== 'offense') {
+    return {
+      ...analysis,
+      trustAssumption: 'default_owner_trust',
+    };
+  }
+
+  const ownerTrust = analysis.trustAssumption === 'default_owner_trust';
+  const confidentOwnerIntent = analysis.ownerIntentConfidence >= 0.65;
+  const moderateHeat = analysis.heatLevel >= 0.4;
+  const moderateDominance = analysis.dominanceTone >= 0.45;
+  const lowNegativeShock = analysis.shockScore <= 0.55;
+
+  // owner 模式下，如果结构化结果已经说明这更像亲密意图，
+  // 就不继续保留 offense，而是映射回更合理的 owner 私密事件。
+  if (!(ownerTrust || confidentOwnerIntent || moderateHeat || moderateDominance) || !lowNegativeShock) {
+    return {
+      ...analysis,
+      trustAssumption: 'default_owner_trust',
+    };
+  }
+
+  const intense = analysis.shockScore >= 0.6 || analysis.targetIntensity >= 0.65;
+  const possessive = analysis.dominanceTone >= 0.55;
+
+  if (possessive) {
+    return {
+      eventType: 'owner_possessive',
+      targetEmotion: 'playful',
+      targetIntensity: Math.max(0.68, analysis.targetIntensity),
+      shockScore: Math.min(analysis.shockScore, 0.45),
+      trustAssumption: 'default_owner_trust',
+      heatLevel: Math.max(analysis.heatLevel, 0.7),
+      dominanceTone: Math.max(analysis.dominanceTone, 0.65),
+      ownerIntentConfidence: Math.max(analysis.ownerIntentConfidence, 0.85),
+      reason: '主人模式下识别为带支配感的私密调情，不按冒犯处理',
+    };
+  }
+
+  return {
+    eventType: intense ? 'sexual_owner_intense' : 'sexual_owner_soft',
+    targetEmotion: intense ? 'happy' : 'playful',
+    targetIntensity: Math.max(intense ? 0.74 : 0.62, analysis.targetIntensity),
+    shockScore: Math.min(analysis.shockScore, 0.4),
+    trustAssumption: 'default_owner_trust',
+    heatLevel: Math.max(analysis.heatLevel, intense ? 0.8 : 0.62),
+    dominanceTone: analysis.dominanceTone,
+    ownerIntentConfidence: Math.max(analysis.ownerIntentConfidence, 0.85),
+    reason: '主人模式下识别为私密升温，不按冒犯处理',
+  };
+}
+
+/**
  * 把 LLM 的分析结果合并到当前情绪，得到新的情绪状态。
  *
  * 这个方法实现了两种核心机制：
@@ -207,10 +313,22 @@ function shouldWriteSnapshot(previous: EmotionState, next: EmotionState, shockSc
  */
 function mergeEmotionState(
   current: EmotionState,
-  analysis: z.infer<typeof emotionAnalysisSchema>,
+  analysis: EmotionAnalysis,
 ): EmotionState {
+  // owner 模式下的私密升温事件也允许快速切换，但目标应是 playful / happy，而不是 annoyed。
+  if (isOwnerPositiveEvent(analysis.eventType) && analysis.targetIntensity >= 0.68) {
+    return {
+      primary: analysis.targetEmotion,
+      intensity: Math.max(0.68, analysis.targetIntensity),
+      lastUpdated: new Date().toISOString(),
+    };
+  }
+
   // grief / offense / risk 且冲击度足够高时，允许直接切换主情绪。
-  if (analysis.eventType !== 'normal' && analysis.shockScore >= SHOCK_THRESHOLD) {
+  if (
+    ['grief', 'offense', 'risk'].includes(analysis.eventType)
+    && analysis.shockScore >= SHOCK_THRESHOLD
+  ) {
     return {
       primary: analysis.targetEmotion,
       intensity: Math.max(0.75, analysis.targetIntensity),
@@ -261,6 +379,7 @@ function mergeEmotionState(
  * - 长上下文摘要
  * - 最近尚未压缩的几轮对话
  * - 最近趋势摘要
+ * - 当前关系角色 / 当前关系阶段
  *
  * @param params - 当前轮情绪分析所需输入
  * @returns 结构化的情绪分析结果
@@ -271,6 +390,8 @@ async function analyzeEmotion(params: {
   contextSummary?: string;
   unextractedMessages: string[];
   trendSummary?: string;
+  relationRole?: string;
+  relationStage?: string;
 }) {
   const { output } = await generateText({
     model: getDeepSeekChat(),
@@ -281,6 +402,8 @@ async function analyzeEmotion(params: {
       contextSummary: params.contextSummary,
       unextractedMessages: params.unextractedMessages,
       trendSummary: params.trendSummary,
+      relationRole: params.relationRole,
+      relationStage: params.relationStage,
       currentMessage: params.currentMessage,
     }),
   });
@@ -291,11 +414,15 @@ async function analyzeEmotion(params: {
       targetEmotion: 'neutral' as const,
       targetIntensity: 0.3,
       shockScore: 0,
+      trustAssumption: params.relationRole === 'owner' ? 'default_owner_trust' as const : 'normal' as const,
+      heatLevel: 0,
+      dominanceTone: 0,
+      ownerIntentConfidence: 0,
       reason: '没有足够的情绪信号',
     };
   }
 
-  return output;
+  return postProcessAnalysis(output, params.relationRole);
 }
 
 /**
@@ -393,6 +520,8 @@ export async function getEmotionContext(params: {
  * @param params.platform - 平台标识
  * @param params.platformId - 平台内用户 ID
  * @param params.intimacyScore - 当前亲密度
+ * @param params.relationRole - 当前关系角色（普通用户 / owner）
+ * @param params.relationStage - 当前关系阶段
  * @param params.currentMessage - 当前用户消息
  * @returns 新的情绪状态、趋势摘要和本轮分析结果
  */
@@ -401,6 +530,8 @@ export async function updateEmotionState(params: {
   platform: string;
   platformId: string;
   intimacyScore: number;
+  relationRole?: string;
+  relationStage?: string;
   currentMessage: string;
 }) {
   const context = await getEmotionContext(params);
@@ -410,6 +541,8 @@ export async function updateEmotionState(params: {
     contextSummary: context.contextSummary,
     unextractedMessages: context.unextractedMessages,
     trendSummary: context.trendSummary,
+    relationRole: params.relationRole,
+    relationStage: params.relationStage,
   });
 
   const nextState = mergeEmotionState(context.state, analysis);

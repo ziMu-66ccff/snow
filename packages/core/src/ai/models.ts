@@ -17,18 +17,8 @@ function getDeepSeekProvider() {
   return _deepseek;
 }
 
-/** DeepSeek V3 — M1 主力模型：日常对话、记忆提取、关系分析 */
-export function getDeepSeekChat(): LanguageModel {
-  return getDeepSeekProvider()('deepseek-chat');
-}
-
-/** DeepSeek R1 — 深度推理：复杂情感场景、困难对话 */
-export function getDeepSeekReasoner(): LanguageModel {
-  return getDeepSeekProvider()('deepseek-reasoner');
-}
-
 // ============================================
-// OpenRouter Provider — Embedding（lazy 初始化）
+// OpenRouter Provider（lazy 初始化）
 // ============================================
 
 let _openrouter: ReturnType<typeof createOpenAI> | null = null;
@@ -41,6 +31,21 @@ function getOpenRouterProvider() {
     });
   }
   return _openrouter;
+}
+
+/** Euryale 70B via OpenRouter — 主对话模型：陪伴、风格、人设表达 */
+export function getEuryale70B(): LanguageModel {
+  return getOpenRouterProvider().chat('sao10k/l3.3-euryale-70b');
+}
+
+/** DeepSeek Chat — 低成本备用模型 */
+export function getDeepSeekChat(): LanguageModel {
+  return getDeepSeekProvider()('deepseek-chat');
+}
+
+/** DeepSeek Reasoner — 复杂推理备用模型 */
+export function getDeepSeekReasoner(): LanguageModel {
+  return getDeepSeekProvider()('deepseek-reasoner');
 }
 
 /** BAAI bge-m3 via OpenRouter — 记忆向量化（1024 维） */

@@ -2,7 +2,7 @@ import { config } from 'dotenv';
 config({ path: '.env.local' });
 
 import { getChatResponse } from '../../src/ai/chat.js';
-import { getEmotionContext } from '../../src/emotion/engine.js';
+import { getEmotionContext, updateEmotionState } from '../../src/emotion/engine.js';
 import { executeIdleTasks } from '../../src/scheduler/task-scheduler.js';
 import { createTestUser, cleanupTestUser } from './test-utils.js';
 import { cancelDelayedTask } from '../../src/scheduler/delayed-task.js';
@@ -24,6 +24,11 @@ async function sendMessage(platformId: string, platform: string, content: string
 async function test() {
   console.log('🧪 Batch 6 验证：情绪系统\n');
   const testUser = await createTestUser('test_emotion', { intimacyScore: 40 });
+  const ownerUser = await createTestUser('test_emotion_owner', {
+    role: 'owner',
+    stage: 'intimate',
+    intimacyScore: 95,
+  });
 
   try {
     console.log('--- 测试 1：低落消息触发 caring / worried ---');
@@ -59,9 +64,24 @@ async function test() {
       intimacyScore: 40,
     });
     console.log(`趋势摘要：${context3.trendSummary ?? '[empty]'}`);
+
+    console.log('\n--- 测试 4：owner 私密调情不应误判为 annoyed ---');
+    const ownerEmotion = await updateEmotionState({
+      userId: ownerUser.user.id,
+      platform: ownerUser.platform,
+      platformId: ownerUser.platformId,
+      intimacyScore: 95,
+      relationRole: 'owner',
+      relationStage: 'intimate',
+      currentMessage: '我的宝贝，我想把你抱过来，慢慢摸你的大腿和玉足，再把你绑在我怀里。',
+    });
+    console.log(`owner 事件类型：${ownerEmotion.analysis.eventType}`);
+    console.log(`owner 情绪：${ownerEmotion.state.primary} (${ownerEmotion.state.intensity.toFixed(2)})`);
   } finally {
     cancelDelayedTask(testUser.platform, testUser.platformId);
     await cleanupTestUser(testUser.user.id, testUser.platform, testUser.platformId);
+    cancelDelayedTask(ownerUser.platform, ownerUser.platformId);
+    await cleanupTestUser(ownerUser.user.id, ownerUser.platform, ownerUser.platformId);
   }
 
   process.exit(0);
@@ -71,4 +91,3 @@ test().catch((error) => {
   console.error(error);
   process.exit(1);
 });
-

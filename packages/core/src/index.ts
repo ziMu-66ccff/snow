@@ -4,10 +4,10 @@ export { db, client } from './db/client.js';
 export { redis } from './db/redis.js';
 
 // AI — Models
-export { getDeepSeekChat, getDeepSeekReasoner, getEmbeddingModel } from './ai/models.js';
+export { getEuryale70B, getDeepSeekChat, getDeepSeekReasoner, getEmbeddingModel } from './ai/models.js';
 
 // AI — Prompt
-export { composeSystemPrompt, type PromptComposerContext } from './ai/prompts/composer.js';
+export { composeSystemPrompt, type PromptComposerContext } from './ai/prompts-composer.js';
 
 // AI — Message Utils（统一处理 ModelMessage 多类型 content）
 export {
