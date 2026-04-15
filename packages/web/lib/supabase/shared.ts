@@ -8,12 +8,12 @@ function getRequiredEnv(name: string): string {
 }
 
 export function getSupabaseUrl(): string {
-  return getRequiredEnv('NEXT_PUBLIC_SUPABASE_URL');
+  return getRequiredEnv('NEXT_PUBLIC_WEB_SUPABASE_URL');
 }
 
 /**
  * Web 端统一使用 Supabase 的 publishable key。
  */
 export function getSupabasePublishableKey(): string {
-  return getRequiredEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY');
+  return getRequiredEnv('NEXT_PUBLIC_WEB_SUPABASE_PUBLISHABLE_KEY');
 }

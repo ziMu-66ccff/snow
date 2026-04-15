@@ -18,9 +18,9 @@ interface IdleTaskPayload {
  * - 把执行权交回 Snow core。
  */
 export async function POST(request: Request): Promise<Response> {
-  const currentSigningKey = process.env.QSTASH_CURRENT_SIGNING_KEY;
-  const nextSigningKey = process.env.QSTASH_NEXT_SIGNING_KEY;
-  const callbackUrl = process.env.SNOW_IDLE_TASK_URL;
+  const currentSigningKey = process.env.WEB_QSTASH_CURRENT_SIGNING_KEY;
+  const nextSigningKey = process.env.WEB_QSTASH_NEXT_SIGNING_KEY;
+  const callbackUrl = process.env.WEB_QSTASH_IDLE_CALLBACK_URL;
 
   if (!currentSigningKey || !nextSigningKey || !callbackUrl) {
     return new Response('QStash callback env is not configured', { status: 500 });

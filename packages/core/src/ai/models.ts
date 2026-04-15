@@ -1,6 +1,12 @@
+import { config } from 'dotenv';
 import { createDeepSeek } from '@ai-sdk/deepseek';
 import { createOpenAI } from '@ai-sdk/openai';
 import type { EmbeddingModel, LanguageModel } from 'ai';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const envPath = resolve(dirname(fileURLToPath(import.meta.url)), '../../.env.local');
+config({ path: envPath });
 
 // ============================================
 // DeepSeek Provider（lazy 初始化）
@@ -10,8 +16,13 @@ let _deepseek: ReturnType<typeof createDeepSeek> | null = null;
 
 function getDeepSeekProvider() {
   if (!_deepseek) {
+    const apiKey = process.env.CORE_DEEPSEEK_API_KEY;
+    if (!apiKey) {
+      throw new Error('CORE_DEEPSEEK_API_KEY is not set');
+    }
+
     _deepseek = createDeepSeek({
-      apiKey: process.env.DEEPSEEK_API_KEY ?? '',
+      apiKey,
     });
   }
   return _deepseek;
@@ -25,8 +36,13 @@ let _openrouter: ReturnType<typeof createOpenAI> | null = null;
 
 function getOpenRouterProvider() {
   if (!_openrouter) {
+    const apiKey = process.env.CORE_OPENROUTER_API_KEY;
+    if (!apiKey) {
+      throw new Error('CORE_OPENROUTER_API_KEY is not set');
+    }
+
     _openrouter = createOpenAI({
-      apiKey: process.env.OPENROUTER_API_KEY ?? '',
+      apiKey,
       baseURL: 'https://openrouter.ai/api/v1',
     });
   }

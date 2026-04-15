@@ -54,8 +54,6 @@ snow/
 │
 ├── doc/                       ← 项目文档
 ├── drizzle/                   ← Drizzle 迁移文件
-├── .env.local                 ← 环境变量（不提交 Git）
-├── .env.example               ← 环境变量模板
 ├── .gitignore
 ├── pnpm-workspace.yaml
 ├── package.json               ← 根 package.json
@@ -71,6 +69,12 @@ packages/qq    → @snow/core（M4+）
 
 所有壳只依赖 core，壳之间互不依赖。
 ```
+
+当前环境变量边界：
+
+- `packages/core/.env.local`：只维护 Snow core 自己的数据库、Redis、模型、QStash 发布能力
+- `packages/web/.env.local`：只维护 Web 载体自己的 Supabase Auth 与 QStash 回调验签
+- 根目录不再维护共享 `.env.local`
 
 ### core 对外 API
 ```typescript

@@ -3,7 +3,7 @@
  * 使用独立测试用户，不污染真实数据
  */
 import { config } from 'dotenv';
-config({ path: '.env.local' });
+config({ path: './packages/core/.env.local' });
 
 import { getChatResponse } from '../../src/ai/chat.js';
 import { createTestUser, cleanupTestUser } from './test-utils.js';

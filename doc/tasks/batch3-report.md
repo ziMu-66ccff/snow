@@ -41,7 +41,7 @@
 | `core/src/index.ts` | 新增 memory 模块导出 |
 | `core/scripts/chat.ts` | 退出时自动调用 `writeMemories()` 保存记忆 |
 | `package.json`（根） | 新增 `script:test-memory-write` 命令 |
-| `.env.local` / `.env.example` | 新增 `OPENROUTER_API_KEY` |
+| `.env.local` / `.env.example` | 当时新增 `OPENROUTER_API_KEY`；当前主分支已改为 `packages/core` / `packages/web` 分别维护 env |
 
 ### 4. 记忆提取设计
 

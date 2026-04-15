@@ -5,7 +5,7 @@
  * 这个脚本就是最简单的壳示例。
  */
 import { config } from 'dotenv';
-config({ path: '.env.local' });
+config({ path: './packages/core/.env.local' });
 
 // 启用性能计时日志
 process.env.DEBUG_PERF = '1';

@@ -1,9 +1,9 @@
 import { config } from 'dotenv';
-config({ path: '.env.local' });
+config({ path: './packages/core/.env.local' });
 
 import postgres from 'postgres';
 
-const sql = postgres(process.env.DATABASE_URL!);
+const sql = postgres(process.env.CORE_DATABASE_URL!);
 
 async function main() {
   try {

@@ -1,13 +1,17 @@
 import { config } from 'dotenv';
-config({ path: '.env.local' });
 import { drizzle } from 'drizzle-orm/postgres-js';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import postgres from 'postgres';
 import * as schema from './schema';
 
-const connectionString = process.env.DATABASE_URL;
+const envPath = resolve(dirname(fileURLToPath(import.meta.url)), '../../.env.local');
+config({ path: envPath });
+
+const connectionString = process.env.CORE_DATABASE_URL;
 
 if (!connectionString) {
-  throw new Error('DATABASE_URL is not set');
+  throw new Error('CORE_DATABASE_URL is not set');
 }
 
 // 创建 postgres 连接（适合 Serverless 的配置）

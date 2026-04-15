@@ -7,7 +7,7 @@
  * 3. 验证记忆、关系、情绪、摘要都已落库
  */
 import { config } from 'dotenv';
-config({ path: '.env.local' });
+config({ path: './packages/core/.env.local' });
 
 import { eq } from 'drizzle-orm';
 import type { ModelMessage } from 'ai';

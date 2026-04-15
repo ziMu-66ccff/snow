@@ -2,7 +2,7 @@
 
 > 所属：产品外壳 | 里程碑：M2 Batch 1  
 > 依赖：Next.js + Vercel AI SDK + `@snow/core` + Supabase + Upstash  
-> 版本：v0.4  
+> 版本：v0.8  
 > 日期：2026-04-13  
 > 状态：实现中
 
@@ -321,50 +321,38 @@ M2 目标部署方式：
 
 - `packages/web` → Vercel
 
-### 7.2 Web 需要的环境变量
+### 7.2 Web 与 core 的环境变量边界
 
-至少包括：
+当前环境变量策略已经收敛为：
 
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-- Snow core 运行所需环境变量
-  - `DATABASE_URL`
-  - `UPSTASH_REDIS_REST_URL`
-  - `UPSTASH_REDIS_REST_TOKEN`
-  - 模型 provider key
-  - `QSTASH_TOKEN`
-  - `SNOW_IDLE_TASK_URL`
-  - `QSTASH_CURRENT_SIGNING_KEY`
-  - `QSTASH_NEXT_SIGNING_KEY`
+- 根目录不再维护共享 `.env.local`
+- `packages/core/.env.local` 只维护 Snow core 自己的运行时配置
+- `packages/web/.env.local` 只维护 Web 壳自己的配置
+- 两边的 key **不允许重名**
 
-当前本地运行口径已经证明：
+`packages/core/.env.local`：
 
-- Web 和 core 共用同一套云端服务
-- 部署时不需要重新设计变量结构
+- `CORE_DATABASE_URL`
+- `CORE_DEEPSEEK_API_KEY`
+- `CORE_OPENROUTER_API_KEY`
+- `CORE_UPSTASH_REDIS_REST_URL`
+- `CORE_UPSTASH_REDIS_REST_TOKEN`
+- `CORE_QSTASH_TOKEN`
+- `CORE_QSTASH_IDLE_CALLBACK_URL`
 
-因此线上部署最简单的做法就是：
+`packages/web/.env.local`：
 
-1. 把本地 `packages/web/.env.local` 中当前实际生效的变量原样搬到 Vercel
-2. 只把 `SNOW_IDLE_TASK_URL` 从本地调试地址改成真实线上域名
+- `NEXT_PUBLIC_WEB_SUPABASE_URL`
+- `NEXT_PUBLIC_WEB_SUPABASE_PUBLISHABLE_KEY`
+- `WEB_QSTASH_CURRENT_SIGNING_KEY`
+- `WEB_QSTASH_NEXT_SIGNING_KEY`
+- `WEB_QSTASH_IDLE_CALLBACK_URL`
 
-当前线上实际必填变量清单：
+部署时的原则不是“把根目录 env 整份搬过去”，而是：
 
-- `DATABASE_URL`
-- `DEEPSEEK_API_KEY`
-- `OPENROUTER_API_KEY`
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-- `UPSTASH_REDIS_REST_URL`
-- `UPSTASH_REDIS_REST_TOKEN`
-- `QSTASH_TOKEN`
-- `QSTASH_CURRENT_SIGNING_KEY`
-- `QSTASH_NEXT_SIGNING_KEY`
-- `SNOW_IDLE_TASK_URL`
-
-当前可选但代码未直接使用：
-
-- `QSTASH_URL`
-- `DIRECT_URL`
+1. 分别查看 `packages/core/.env.local` 与 `packages/web/.env.local`
+2. 把两边 key 全部注入部署环境
+3. 保证 `CORE_QSTASH_IDLE_CALLBACK_URL` 与 `WEB_QSTASH_IDLE_CALLBACK_URL` 指向同一个公网回调地址
 
 ### 7.3 为什么适合 Vercel
 
@@ -394,7 +382,7 @@ nvm use
 
 为了回到框架推荐路径，`@snow/core` 内部模块导入已经收敛到 bundler 友好的写法，不再依赖 webpack 专属的 `extensionAlias` 兼容层。
 
-Next.js 运行时环境变量按 `packages/web/.env.local` 读取。本地联调时，Web 所需的 Supabase、QStash 和 core 运行变量都需要出现在该文件中，不能只放在仓库根目录 `.env.local`。
+Next.js 运行时环境变量按 `packages/web/.env.local` 读取。由于 `packages/web` 会直接 import `@snow/core`，部署时需要把 `packages/core` 与 `packages/web` 这两份 env 的 key 一起注入平台环境，但本地维护仍保持两份文件分离。
 
 ---
 
@@ -457,4 +445,5 @@ Web 中会有一个：
 | 2026-04-15 | v0.4 | 新增 Web UI 重构口径：夜间编辑部视觉方向、聊天页双栏信息架构、客户端状态拆分原则 |
 | 2026-04-15 | v0.5 | 注册链路补充邮箱显式判重与登录时 core 用户记录对齐策略 |
 | 2026-04-15 | v0.6 | 明确 web/core 边界：web 不直接操作 core 数据库，core 在聊天链路里自动建档；name 的 trim 和归一化由 web 负责 |
-| 2026-04-15 | v0.7 | 同步部署口径：`.env.example` 与真实运行变量一致，明确线上只需搬运现有 env 并替换 `SNOW_IDLE_TASK_URL` |
+| 2026-04-15 | v0.7 | 同步部署口径：补齐部署模板并明确 idle 回调地址需要在本地与线上分别配置 |
+| 2026-04-15 | v0.8 | env 结构重构：删除根目录 env，改为 `packages/core` 与 `packages/web` 各自维护 `.env.local` / `.env.example`，且 key 不重名 |

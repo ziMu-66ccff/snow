@@ -1,5 +1,5 @@
 import { config } from 'dotenv';
-config({ path: '.env.local' });
+config({ path: './packages/core/.env.local' });
 
 import { getChatResponse } from '../../src/ai/chat.js';
 import { getEmotionContext, updateEmotionState } from '../../src/emotion/engine.js';

@@ -4,7 +4,7 @@
  * 建议每周运行一次
  */
 import { config } from 'dotenv';
-config({ path: '.env.local' });
+config({ path: './packages/core/.env.local' });
 
 import { gcAllMemories } from '../../src/memory/gc.js';
 

@@ -130,14 +130,13 @@ Batch 1 的延时任务语义保持和 M1 一致：
 9. Web UI 第一轮重构：聊天页重排为侧栏 + 主舞台结构，认证页视觉语言统一
 10. 前端组件职责收口：拆分聊天状态 hook、侧栏、主舞台与表单字段组件
 11. Auth 链路修正：注册时显式识别重复邮箱，并把 core 用户建档职责收回到 chat 链路
-12. 部署收口：`.env.example` 与真实运行变量对齐，明确线上仅需搬运本地 env 并替换 `SNOW_IDLE_TASK_URL`
+12. 部署收口：按 `packages/core/.env.example` 与 `packages/web/.env.example` 拆分 env，明确 core/web 键名不重叠
 
 待完成：
 
-1. 真正接入线上 Supabase Web 项目环境变量
-2. 真正接入 QStash 生产配置
-3. 在 Vercel 环境实测完整回调链路
-4. 基于真实使用继续微调聊天页文案、排版和交互细节
+1. 在 Vercel / 其他部署环境里分别注入 `packages/core` 与 `packages/web` 所需 env
+2. 在 Vercel 环境实测完整回调链路
+3. 基于真实使用继续微调聊天页文案、排版和交互细节
 
 ### 验证
 

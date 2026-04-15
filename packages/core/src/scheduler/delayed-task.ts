@@ -11,8 +11,11 @@
  * - Web 只暴露一个极薄的 HTTP 回调入口。
  * - 为了兼容本地 CLI 调试，未配置 QStash 时保留 setTimeout fallback。
  */
+import { config } from 'dotenv';
 import { randomUUID } from 'node:crypto';
 import { Client } from '@upstash/qstash';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { type UserIdentifier, executeIdleTasks } from './task-scheduler';
 import {
   acquireIdleTaskExecutionLock,
@@ -23,6 +26,9 @@ import {
 
 /** 延时时间：30 分钟（秒） */
 const DELAY_SECONDS = 30 * 60;
+
+const envPath = resolve(dirname(fileURLToPath(import.meta.url)), '../../.env.local');
+config({ path: envPath });
 
 /** 本地 CLI fallback 的定时器（仅在未配置 QStash 时使用） */
 const localTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -36,22 +42,24 @@ function timerKey(platform: string, platformId: string): string {
 }
 
 function isQStashConfigured(): boolean {
-  return Boolean(process.env.QSTASH_TOKEN && process.env.SNOW_IDLE_TASK_URL);
+  return Boolean(
+    process.env.CORE_QSTASH_TOKEN && process.env.CORE_QSTASH_IDLE_CALLBACK_URL,
+  );
 }
 
 function getQStashClient(): Client {
-  const token = process.env.QSTASH_TOKEN;
+  const token = process.env.CORE_QSTASH_TOKEN;
   if (!token) {
-    throw new Error('QSTASH_TOKEN is not set');
+    throw new Error('CORE_QSTASH_TOKEN is not set');
   }
 
   return new Client({ token });
 }
 
 function getIdleTaskCallbackUrl(): string {
-  const url = process.env.SNOW_IDLE_TASK_URL;
+  const url = process.env.CORE_QSTASH_IDLE_CALLBACK_URL;
   if (!url) {
-    throw new Error('SNOW_IDLE_TASK_URL is not set');
+    throw new Error('CORE_QSTASH_IDLE_CALLBACK_URL is not set');
   }
 
   return url;

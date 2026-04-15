@@ -2,7 +2,7 @@
 
 > 所属：核心基础设施 | 里程碑：M2 Batch 1  
 > 依赖：Upstash QStash + Upstash Redis + Next.js Route Handler  
-> 版本：v0.2  
+> 版本：v0.3  
 > 日期：2026-04-13  
 > 状态：实现中
 
@@ -122,7 +122,7 @@ M2 使用：
 
 为了不打断当前 CLI 测试和本地联调，core 仍保留一个开发期回退：
 
-- 如果未配置 `QSTASH_TOKEN` 或 `SNOW_IDLE_TASK_URL`
+- 如果未配置 `CORE_QSTASH_TOKEN` 或 `CORE_QSTASH_IDLE_CALLBACK_URL`
 - `scheduleDelayedTask()` 会退回进程内 `setTimeout`
 
 这只是本地开发兜底，不是生产方案。生产与 Vercel 部署时仍以 QStash 为准。
@@ -209,7 +209,7 @@ Snow core 执行完整收尾逻辑
 1. 验证 QStash 签名
 2. 调用 `@snow/core` 的 `handleDelayedTaskCallback()`
 
-当 Web 通过 tunnel 或反向代理暴露在公网时，验签应使用 QStash 实际调用的公网地址，也就是 `SNOW_IDLE_TASK_URL`。不能直接拿 `request.url` 做校验，否则在 `localhost` / tunnel 转发场景下会出现签名不匹配。
+当 Web 通过 tunnel 或反向代理暴露在公网时，验签应使用 QStash 实际调用的公网地址，也就是 `WEB_QSTASH_IDLE_CALLBACK_URL`。core 侧发布任务时使用 `CORE_QSTASH_IDLE_CALLBACK_URL`。这两个 key 虽然值应相同，但分别归属于 core 与 web，不能共享同一个 env 名。
 
 ---
 
@@ -371,7 +371,7 @@ app/api/tasks/idle/route.ts
 
 为了不打断现有 CLI 和本地测试，当前实现保留了一个开发态 fallback：
 
-- 若未配置 `QSTASH_TOKEN` 或 `SNOW_IDLE_TASK_URL`
+- 若未配置 `CORE_QSTASH_TOKEN` 或 `CORE_QSTASH_IDLE_CALLBACK_URL`
 - `scheduleDelayedTask()` 会退回到进程内 `setTimeout`
 
 这个 fallback 只用于本地开发。  
