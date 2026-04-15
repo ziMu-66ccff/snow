@@ -4,8 +4,8 @@
  * 将 Redis 中的热数据（context_summary）写入 PG 冷存储，
  * 作为下次新会话时的"上次对话摘要"兜底。
  */
-import { getMemoryContextSummary } from '../db/queries/redis-store.js';
-import { insertConversation } from '../db/queries/memory-read.js';
+import { getMemoryContextSummary } from '../db/queries/redis-store';
+import { insertConversation } from '../db/queries/memory-read';
 
 /**
  * 持久化摘要

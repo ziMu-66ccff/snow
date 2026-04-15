@@ -73,11 +73,7 @@ ${params.currentMessage}
 2. targetEmotion
 3. targetIntensity（0-1）
 4. shockScore（0-1）
-5. trustAssumption（owner 默认是 default_owner_trust，否则是 normal）
-6. heatLevel（0-1）
-7. dominanceTone（0-1）
-8. ownerIntentConfidence（0-1）
-9. reason（一句中文）
+5. reason（一句中文）
 
 ## 普通规则
 - 普通消息不要轻易给高 shockScore

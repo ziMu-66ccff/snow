@@ -16,14 +16,14 @@
  * 内部固定使用 DeepSeek Chat 生成总结
  */
 import { type ModelMessage } from 'ai';
-import { isConversationMessage, isProtectedMessage, messageToText, formatMessages } from './message-utils.js';
-import { generateConversationSummary } from '../memory/summarizer.js';
+import { isConversationMessage, isProtectedMessage, messageToText, formatMessages } from './message-utils';
+import { generateConversationSummary } from '../memory/summarizer';
 import {
   getChatSummary,
   getChatSummarizedUpTo,
   setChatSummary,
   clearChatSummary,
-} from '../db/queries/redis-store.js';
+} from '../db/queries/redis-store';
 
 /** 对话历史的 token 上限（只算 user/assistant 消息） */
 const TOKEN_LIMIT = 40000;

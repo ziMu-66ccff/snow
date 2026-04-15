@@ -1,8 +1,8 @@
 # Snow M2 — 分批任务清单（草稿）
 
-> 日期：2026-04-10  
-> 版本：v0.1  
-> 状态：讨论中  
+> 日期：2026-04-13  
+> 版本：v0.2  
+> 状态：进行中  
 > 原则：**先把 Snow 从 CLI 核心引擎推进到可部署的 Web 产品，再扩展消息能力与调度能力**
 
 ---
@@ -74,7 +74,7 @@ Batch 1 中必须保持以下边界：
 - `scheduleDelayedTask()` / `cancelDelayedTask()` / `executeIdleTasks()` 仍然属于 `@snow/core`
 - 延时任务的业务语义、覆盖逻辑、幂等逻辑都在 core 中实现
 - `packages/web` 只提供一个可被 QStash 调用的 HTTP 回调入口
-- 该回调入口只负责验签和调用 `@snow/core` 的 `executeIdleTasks()`，不承载 Snow 业务逻辑
+- 该回调入口只负责验签和调用 `@snow/core` 的 `handleDelayedTaskCallback()`，不承载 Snow 业务逻辑
 
 也就是说：
 
@@ -114,6 +114,30 @@ Batch 1 的延时任务语义保持和 M1 一致：
 5. 进程内 `Map` 覆盖逻辑不适合生产
 6. 调度链路缺幂等约束
 7. Idle 任务的失败恢复机制不完整
+
+### 当前进展
+
+已完成：
+
+1. `packages/web` 基础结构
+2. Supabase Auth 最小登录 / 注册
+3. 聊天页面与 `/api/chat`
+4. `/api/tasks/idle`
+5. `@snow/core` 中的 QStash 调度重构
+6. 覆盖逻辑与幂等锁
+7. Web 前端切换到 `useChat`
+8. Node.js 运行时基线升级到 24.10.0
+9. Web UI 第一轮重构：聊天页重排为侧栏 + 主舞台结构，认证页视觉语言统一
+10. 前端组件职责收口：拆分聊天状态 hook、侧栏、主舞台与表单字段组件
+11. Auth 链路修正：注册时显式识别重复邮箱，并把 core 用户建档职责收回到 chat 链路
+12. 部署收口：`.env.example` 与真实运行变量对齐，明确线上仅需搬运本地 env 并替换 `SNOW_IDLE_TASK_URL`
+
+待完成：
+
+1. 真正接入线上 Supabase Web 项目环境变量
+2. 真正接入 QStash 生产配置
+3. 在 Vercel 环境实测完整回调链路
+4. 基于真实使用继续微调聊天页文案、排版和交互细节
 
 ### 验证
 

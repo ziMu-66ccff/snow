@@ -7,6 +7,9 @@
 import { config } from 'dotenv';
 config({ path: '.env.local' });
 
+// 启用性能计时日志
+process.env.DEBUG_PERF = '1';
+
 import * as readline from 'node:readline';
 import type { ModelMessage } from 'ai';
 import { getChatResponse, finalizeSession } from '../src/ai/chat.js';

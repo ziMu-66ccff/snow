@@ -163,7 +163,7 @@ async function test() {
     console.log('\n--- 清理测试数据 ---\n');
 
     const { cancelDelayedTask } = await import('../../src/scheduler/delayed-task.js');
-    cancelDelayedTask(platform, platformId);
+    await cancelDelayedTask(platform, platformId);
 
     await cleanupTestUser(user.id, platform, platformId);
   }

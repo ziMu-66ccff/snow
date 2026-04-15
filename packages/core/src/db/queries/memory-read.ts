@@ -1,6 +1,6 @@
 import { eq, desc, sql, inArray } from 'drizzle-orm';
-import { db } from '../client.js';
-import { factualMemories, semanticMemories, conversations } from '../schema.js';
+import { db } from '../client';
+import { factualMemories, semanticMemories, conversations } from '../schema';
 
 /**
  * 获取用户的基本事实记忆（必选池）

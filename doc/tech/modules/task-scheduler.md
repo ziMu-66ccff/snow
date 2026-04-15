@@ -2,9 +2,9 @@
 
 > 所属：核心基础设施 | 里程碑：M2 Batch 1  
 > 依赖：Upstash QStash + Upstash Redis + Next.js Route Handler  
-> 版本：v0.1  
-> 日期：2026-04-10  
-> 状态：讨论中
+> 版本：v0.2  
+> 日期：2026-04-13  
+> 状态：实现中
 
 ---
 
@@ -50,6 +50,15 @@ M2 的目标是：
 
 都应继续属于 `packages/core`。
 
+当前实现另外增加了：
+
+- `handleDelayedTaskCallback()`
+
+这个函数同样属于 core，用来判断：
+
+- 当前回调是不是最新任务
+- 当前回调是不是已经执行过
+
 ### 2.2 Web 只提供回调入口
 
 `packages/web` 只负责提供一个可被 QStash 调用的 HTTP Route Handler，例如：
@@ -60,7 +69,7 @@ M2 的目标是：
 
 1. 验签
 2. 解析任务 payload
-3. 调用 `@snow/core` 的 `executeIdleTasks()`
+3. 调用 `@snow/core` 的 `handleDelayedTaskCallback()`
 
 它不是 Snow 的业务实现层。
 
@@ -108,6 +117,15 @@ M2 使用：
    - 30 分钟后回调
    - 可覆盖旧任务
    - 可做幂等保护
+
+### 3.4 本地开发回退策略
+
+为了不打断当前 CLI 测试和本地联调，core 仍保留一个开发期回退：
+
+- 如果未配置 `QSTASH_TOKEN` 或 `SNOW_IDLE_TASK_URL`
+- `scheduleDelayedTask()` 会退回进程内 `setTimeout`
+
+这只是本地开发兜底，不是生产方案。生产与 Vercel 部署时仍以 QStash 为准。
 
 ### 3.3 不继续使用 `setTimeout` 的原因
 
@@ -175,10 +193,23 @@ QStash 到点回调 /api/tasks/idle
    ↓
 Web Route Handler 验签
    ↓
-调用 executeIdleTasks(user)
+调用 handleDelayedTaskCallback(payload)
+   ↓
+Snow core 校验任务是否过期、是否重复
    ↓
 Snow core 执行完整收尾逻辑
 ```
+
+当前 Web 端入口为：
+
+- `/api/tasks/idle`
+
+该入口只做两件事：
+
+1. 验证 QStash 签名
+2. 调用 `@snow/core` 的 `handleDelayedTaskCallback()`
+
+当 Web 通过 tunnel 或反向代理暴露在公网时，验签应使用 QStash 实际调用的公网地址，也就是 `SNOW_IDLE_TASK_URL`。不能直接拿 `request.url` 做校验，否则在 `localhost` / tunnel 转发场景下会出现签名不匹配。
 
 ---
 
@@ -201,20 +232,50 @@ Snow core 执行完整收尾逻辑
 3. 创建一个新的 30 分钟延时任务
 4. 将新的任务 ID 写回 Redis
 
+### 6.4 关于 QStash 控制台中的 `CANCEL_REQUESTED`
+
+在 Upstash QStash 的日志里，取消消息后通常会先看到：
+
+- `CANCEL_REQUESTED`
+
+这表示：
+
+- QStash 已经记录了取消请求
+- 但该消息还没有进入最终的 `CANCELLED` 终态
+
+对 Snow 这种“30 分钟后触发”的延时任务来说，这很常见：
+
+- 用户继续说话
+- Snow 取消旧任务并推一个新任务
+- 控制台里会留下很多 `CANCEL_REQUESTED`
+
+这**不等于旧任务还会继续执行**。
+
+真正的安全性来自两层：
+
+1. 我们会优先调用 QStash 的 cancel API
+2. 即使旧任务没有被平台立即清干净，`handleDelayedTaskCallback()` 仍会用 Redis 中的最新 `taskId` 判定旧回调为 `stale`
+
+所以：
+
+- 控制台里看到一串 `CANCEL_REQUESTED`，更多是 QStash 的日志表现
+- 是否会误执行，取决于 Snow core 的 `stale / duplicate` 保护
+
 ### 6.3 需要的 Redis 状态
 
-建议新增一个专用 key：
+当前实现新增了一个专用 key：
 
 ```text
-snow:idle-task:{platform}:{platformId}
+snow:scheduler:idle:{platform}:{platformId}
 ```
 
-建议存储：
+当前存储：
 
 ```json
 {
+  "taskId": "web:user-123:uuid",
   "messageId": "qstash-message-id",
-  "scheduledAt": "2026-04-10T12:00:00.000Z"
+  "scheduledFor": "2026-04-10T12:30:00.000Z"
 }
 ```
 
@@ -251,10 +312,10 @@ snow:idle-task:{platform}:{platformId}
 
 ### 7.3 建议方案
 
-建议在 Redis 中为每个执行任务打一个幂等锁，例如：
+当前实现会为每个执行任务打一个幂等锁：
 
 ```text
-snow:idle-task:executed:{taskId}
+snow:scheduler:idle:executed:{taskId}
 ```
 
 执行前：
@@ -286,7 +347,7 @@ app/api/tasks/idle/route.ts
 这个 Route Handler 只做两件事：
 
 1. 验证 QStash 请求合法性
-2. 调用 `@snow/core` 的 `executeIdleTasks()`
+2. 调用 `@snow/core` 的 `handleDelayedTaskCallback()`
 
 ### 8.3 不应在 Web 中做的事
 
@@ -298,6 +359,23 @@ app/api/tasks/idle/route.ts
 - 编排 Snow 的收尾任务
 
 这些都属于 `@snow/core`。
+
+### 8.4 当前代码边界
+
+- Web 回调入口：`packages/web/app/api/tasks/idle/route.ts`
+- core 调度实现：`packages/core/src/scheduler/delayed-task.ts`
+- core 编排实现：`packages/core/src/scheduler/task-scheduler.ts`
+- Redis 状态实现：`packages/core/src/db/queries/redis-store.ts`
+
+### 8.5 本地开发 fallback
+
+为了不打断现有 CLI 和本地测试，当前实现保留了一个开发态 fallback：
+
+- 若未配置 `QSTASH_TOKEN` 或 `SNOW_IDLE_TASK_URL`
+- `scheduleDelayedTask()` 会退回到进程内 `setTimeout`
+
+这个 fallback 只用于本地开发。  
+生产与 Vercel 部署环境必须使用 QStash。
 
 ---
 
@@ -314,6 +392,7 @@ M2 后：
 
 - QStash publish / cancel
 - Redis 记录当前任务 ID
+- 保留本地 fallback
 
 ### 9.2 `chat.ts`
 
@@ -329,6 +408,13 @@ M2 后：
 ### 9.3 `task-scheduler.ts`
 
 `executeIdleTasks()` 继续保留在 core 中，不迁移到 web。
+
+### 9.4 `redis-store.ts`
+
+新增：
+
+- 待执行 idle 任务状态读写
+- idle 执行幂等锁
 
 ---
 
@@ -351,3 +437,5 @@ M2 后：
 | 日期 | 版本 | 变更内容 |
 |------|------|----------|
 | 2026-04-10 | v0.1 | 初稿：M2 调度系统设计，替换 setTimeout 为 QStash |
+| 2026-04-10 | v0.2 | 落地实现：增加 QStash 覆盖逻辑、幂等锁、`handleDelayedTaskCallback()` 与本地 fallback |
+| 2026-04-15 | v0.3 | 补充 QStash `CANCEL_REQUESTED` 状态说明，明确真正安全性来自 cancel + stale/duplicate 双重保护 |

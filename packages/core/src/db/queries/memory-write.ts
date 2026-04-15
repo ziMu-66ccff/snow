@@ -1,6 +1,6 @@
 import { eq, and } from 'drizzle-orm';
-import { db } from '../client.js';
-import { factualMemories, semanticMemories } from '../schema.js';
+import { db } from '../client';
+import { factualMemories, semanticMemories } from '../schema';
 
 /**
  * UPSERT 事实记忆

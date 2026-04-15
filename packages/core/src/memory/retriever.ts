@@ -1,13 +1,14 @@
 import { embed } from 'ai';
-import { getEmbeddingModel } from '../ai/models.js';
-import { memoryVividness } from './vividness.js';
+import { getEmbeddingModel } from '../ai/models';
+import { memoryVividness } from './vividness';
+import { createTimer } from '../utils/perf';
 import {
   getBasicFacts,
   getLastConversationSummary,
   vectorSearchMemories,
   reinforceMemories,
-} from '../db/queries/memory-read.js';
-import { getMemoryContextSummary } from '../db/queries/redis-store.js';
+} from '../db/queries/memory-read';
+import { getMemoryContextSummary } from '../db/queries/redis-store';
 
 export interface RetrievedMemories {
   /** 基本事实，格式化为文本 */
@@ -66,11 +67,13 @@ export async function retrieveMemories(
 ): Promise<RetrievedMemories> {
   // === 必选池 ===
 
+  const tFacts = createTimer('  记忆>基本事实');
   // 基本事实
   const facts = await getBasicFacts(userId);
   const basicFacts = facts.length > 0
     ? facts.map(f => `- ${f.key}: ${f.value}`).join('\n')
     : undefined;
+  tFacts.end();
 
   // 上次对话摘要
   // - 非新会话：当前会话的上下文在 history 里（或被滑动窗口压缩过），
@@ -99,13 +102,17 @@ export async function retrieveMemories(
   // === 动态池 ===
 
   // 1. 向量化当前消息
+  const tEmbed = createTimer('  记忆>Embedding');
   const { embedding: queryVec } = await embed({
     model: getEmbeddingModel(),
     value: userMessage,
   });
+  tEmbed.end();
 
   // 2. pgvector 搜索候选
+  const tSearch = createTimer('  记忆>向量搜索');
   const candidates = await vectorSearchMemories(userId, queryVec, CANDIDATE_POOL_SIZE);
+  tSearch.end();
 
   // 3. 阶段一：相似度门槛过滤（排除不相关的记忆）
   const relevant = candidates.filter(c => c.similarity >= SIMILARITY_THRESHOLD);

@@ -3,7 +3,7 @@
  *
  * 关系层已按阶段拆成独立文件，便于细化和长期维护。
  */
-import { getRelationPromptByStage } from './relations/index.js';
+import { getRelationPromptByStage } from './relations/index';
 
 /**
  * 获取当前关系阶段对应的 Prompt。

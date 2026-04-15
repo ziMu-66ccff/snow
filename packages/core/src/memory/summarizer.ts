@@ -7,8 +7,8 @@
  * - 记忆提取：压缩已提取的对话 → 作为下次提取的背景（maxLength=200）
  */
 import { generateText } from 'ai';
-import { getDeepSeekChat } from '../ai/models.js';
-import { buildConversationSummaryPrompt } from '../prompts/conversation-summary.js';
+import { getDeepSeekChat } from '../ai/models';
+import { buildConversationSummaryPrompt } from '../prompts/conversation-summary';
 
 /**
  * 生成对话摘要

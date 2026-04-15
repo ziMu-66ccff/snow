@@ -13,18 +13,18 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ai-sdk/deepseek": "^2.0.26",
-    "@ai-sdk/openai": "^3.0.49",
-    "@upstash/qstash": "^2.7.0",
-    "@upstash/redis": "^1.34.0",
-    "ai": "^6.0.141",
-    "dotenv": "^16.4.0",
-    "drizzle-orm": "^0.41.0",
-    "postgres": "^3.4.0",
-    "zod": "^3.24.0"
+    "@ai-sdk/deepseek": "^2.0.29",
+    "@ai-sdk/openai": "^3.0.52",
+    "@upstash/qstash": "^2.10.1",
+    "@upstash/redis": "^1.37.0",
+    "ai": "^6.0.158",
+    "dotenv": "^17.4.2",
+    "drizzle-orm": "^0.45.2",
+    "postgres": "^3.4.9",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
-    "typescript": "^5.7.0"
+    "@types/node": "^25.6.0",
+    "typescript": "^6.0.2"
   }
 }

@@ -1,6 +1,6 @@
 import { desc, eq } from 'drizzle-orm';
-import { db } from '../client.js';
-import { emotionStates, emotionTrends } from '../schema.js';
+import { db } from '../client';
+import { emotionStates, emotionTrends } from '../schema';
 
 export interface EmotionSnapshotRow {
   primaryEmotion: string;

@@ -11,23 +11,24 @@
  */
 import { streamText, type ModelMessage } from 'ai';
 import { eq, and } from 'drizzle-orm';
-import { composeSystemPrompt } from './prompts-composer.js';
-import { getDeepSeekChat, getDeepSeekReasoner, getEuryale70B } from './models.js';
-import { applySlidingWindow } from './sliding-window.js';
-import { messageToText } from './message-utils.js';
-import { retrieveMemories } from '../memory/retriever.js';
-import { updateEmotionState } from '../emotion/engine.js';
-import { executePeriodicTasks, executeIdleTasks } from '../scheduler/task-scheduler.js';
-import { scheduleDelayedTask, cancelDelayedTask } from '../scheduler/delayed-task.js';
-import { db } from '../db/client.js';
-import { users, userRelations } from '../db/schema.js';
+import { composeSystemPrompt } from './prompts-composer';
+import { getDeepSeekChat } from './models';
+import { applySlidingWindow } from './sliding-window';
+import { messageToText } from './message-utils';
+import { retrieveMemories } from '../memory/retriever';
+import { updateEmotionState } from '../emotion/engine';
+import { executePeriodicTasks, executeIdleTasks } from '../scheduler/task-scheduler';
+import { scheduleDelayedTask, cancelDelayedTask } from '../scheduler/delayed-task';
+import { createTimer } from '../utils/perf';
+import { db } from '../db/client';
+import { users, userRelations } from '../db/schema';
 import {
   getCachedUserIdentity,
   setCachedUserIdentity,
   pushUnextractedMessages,
   getUnextractedLength,
   type CachedUserIdentity,
-} from '../db/queries/redis-store.js';
+} from '../db/queries/redis-store';
 
 /** 每 N 条消息增量提取一次记忆（5 轮 = 10 条） */
 const EXTRACT_EVERY_N_MESSAGES = 10;
@@ -39,12 +40,16 @@ export interface ChatInput {
   messages: ModelMessage[];
   /** 外部显式注入的 Snow 自定义人格指令 */
   customDirective?: string;
+  /** 用户昵称（可选，没传则用 platformId） */
+  name?: string;
 }
 
 /**
  * 查询用户身份（Redis 缓存 → PG 查询 → 自动创建）
+ *
+ * @param name - 外部传入的用户昵称，仅在自动创建新用户时使用
  */
-async function resolveUserIdentity(platform: string, platformId: string): Promise<CachedUserIdentity> {
+async function resolveUserIdentity(platform: string, platformId: string, name?: string): Promise<CachedUserIdentity> {
   // Redis 缓存命中
   const cached = await getCachedUserIdentity(platform, platformId);
   if (cached) return cached;
@@ -57,11 +62,12 @@ async function resolveUserIdentity(platform: string, platformId: string): Promis
   if (!user) {
     // 未注册用户，自动创建
     const [newUser] = await db.insert(users)
-      .values({ platformId, platform, name: platformId })
+      .values({ platformId, platform, name: name ?? platformId })
       .returning();
 
     await db.insert(userRelations)
-      .values({ userId: newUser.id, role: 'user', stage: 'stranger', intimacyScore: 0 });
+      .values({ userId: newUser.id, role: 'user', stage: 'stranger', intimacyScore: 0 })
+      .onConflictDoNothing();
 
     const identity: CachedUserIdentity = {
       userId: newUser.id,
@@ -77,6 +83,12 @@ async function resolveUserIdentity(platform: string, platformId: string): Promis
   const relation = await db.query.userRelations.findFirst({
     where: eq(userRelations.userId, user.id),
   });
+
+  if (!relation) {
+    await db.insert(userRelations)
+      .values({ userId: user.id, role: 'user', stage: 'stranger', intimacyScore: 0 })
+      .onConflictDoNothing();
+  }
 
   const identity: CachedUserIdentity = {
     userId: user.id,
@@ -99,10 +111,12 @@ async function resolveUserIdentity(platform: string, platformId: string): Promis
  * - Web 用 result.toUIMessageStreamResponse()
  */
 export async function getChatResponse(input: ChatInput): Promise<ReturnType<typeof streamText>> {
-  const { platformId, platform, messages, customDirective } = input;
+  const { platformId, platform, messages, customDirective, name } = input;
 
   // ===== 阶段 1：用户身份 =====
-  const identity = await resolveUserIdentity(platform, platformId);
+  const tIdentity = createTimer('用户身份');
+  const identity = await resolveUserIdentity(platform, platformId, name);
+  tIdentity.end();
   const { userId, userName, role, stage, intimacyScore } = identity;
 
   // ===== 阶段 2：上下文准备 =====
@@ -112,7 +126,9 @@ export async function getChatResponse(input: ChatInput): Promise<ReturnType<type
   const isNewSession = userMessageCount === 1;
 
   // 滑动窗口处理（基于 Redis）
+  const tWindow = createTimer('滑动窗口');
   const processedMessages = await applySlidingWindow(platform, platformId, messages);
+  tWindow.end();
 
   // 提取当前用户消息的文本（取最后一条 user 消息，而非 messages 最后一条）
   const lastUserMessage = [...messages].reverse().find(m => m.role === 'user');
@@ -120,24 +136,27 @@ export async function getChatResponse(input: ChatInput): Promise<ReturnType<type
     ? messageToText(lastUserMessage)
     : '';
 
-  // 检索记忆（retriever 内部根据 isNewSession 决定上次摘要的取法）
-  const memories = await retrieveMemories(
-    userId, currentMessageText, { intimacyScore },
-    isNewSession, platform, platformId,
-  );
-
-  // 情绪系统：基于热上下文 + 当前消息计算当前轮情绪
-  const emotion = await updateEmotionState({
-    userId,
-    platform,
-    platformId,
-    intimacyScore,
-    relationRole: role,
-    relationStage: stage,
-    currentMessage: currentMessageText,
-  });
+  // 记忆检索 + 情绪计算并行执行（互不依赖，并行可省 3-8s）
+  const tParallel = createTimer('记忆+情绪(并行)');
+  const [memories, emotion] = await Promise.all([
+    retrieveMemories(
+      userId, currentMessageText, { intimacyScore },
+      isNewSession, platform, platformId,
+    ),
+    updateEmotionState({
+      userId,
+      platform,
+      platformId,
+      intimacyScore,
+      relationRole: role,
+      relationStage: stage,
+      currentMessage: currentMessageText,
+    }),
+  ]);
+  tParallel.end();
 
   // 组装 Prompt
+  const tPrompt = createTimer('Prompt组装');
   const systemPrompt = composeSystemPrompt({
     userId,
     userName,
@@ -151,37 +170,51 @@ export async function getChatResponse(input: ChatInput): Promise<ReturnType<type
     lastConversationSummary: memories.lastConversationSummary,
     dynamicMemories: memories.dynamicMemories,
   });
+  tPrompt.end();
 
   // ===== 阶段 3：LLM 回复 =====
+  const tLLM = createTimer('LLM首字节');
   const model = getDeepSeekChat();
   const userIdentifier = { userId, platform, platformId };
+
+  let firstChunkLogged = false;
 
   const result = streamText({
     model,
     system: systemPrompt,
     messages: processedMessages,
 
-    // ===== 阶段 4：流结束后自动处理记忆（不依赖外界） =====
-    onFinish: async ({ text }) => {
-      try {
-        // push 到 Redis unextracted
-        await pushUnextractedMessages(
-          platform, platformId,
-          `用户: ${currentMessageText}`,
-          `Snow: ${text}`,
-        );
-
-        // 检查是否触发周期性任务（记忆提取 + 关系评估）
-        const length = await getUnextractedLength(platform, platformId);
-        if (length >= EXTRACT_EVERY_N_MESSAGES) {
-          await executePeriodicTasks(userIdentifier);
-        }
-
-        // 推延时任务（新的覆盖旧的）
-        scheduleDelayedTask(userIdentifier);
-      } catch (err) {
-        console.error('[getChatResponse] 异步记忆处理失败:', err);
+    onChunk: () => {
+      if (!firstChunkLogged) {
+        firstChunkLogged = true;
+        tLLM.end();
       }
+    },
+
+    // ===== 阶段 4：流结束后自动处理记忆（不依赖外界） =====
+    // fire-and-forget：不 await，stream 立即关闭，前端按钮瞬间恢复
+    onFinish: ({ text }) => {
+      void (async () => {
+        try {
+          // push 到 Redis unextracted
+          await pushUnextractedMessages(
+            platform, platformId,
+            `用户: ${currentMessageText}`,
+            `Snow: ${text}`,
+          );
+
+          // 检查是否触发周期性任务（记忆提取 + 关系评估）
+          const length = await getUnextractedLength(platform, platformId);
+          if (length >= EXTRACT_EVERY_N_MESSAGES) {
+            await executePeriodicTasks(userIdentifier);
+          }
+
+          // 推延时任务（新的覆盖旧的）
+          await scheduleDelayedTask(userIdentifier);
+        } catch (err) {
+          console.error('[getChatResponse] 异步记忆处理失败:', err);
+        }
+      })();
     },
   });
 
@@ -198,6 +231,6 @@ export async function getChatResponse(input: ChatInput): Promise<ReturnType<type
  */
 export async function finalizeSession(platformId: string, platform: string): Promise<void> {
   const identity = await resolveUserIdentity(platform, platformId);
-  cancelDelayedTask(platform, platformId);
+  await cancelDelayedTask(platform, platformId);
   await executeIdleTasks({ userId: identity.userId, platform, platformId });
 }

@@ -1,8 +1,8 @@
-import { getFamiliarRelationPrompt } from './familiar.js';
-import { getIntimateRelationPrompt } from './intimate.js';
-import { getOwnerRelationPrompt } from './owner.js';
-import { getStrangerRelationPrompt } from './stranger.js';
-import { getTrustedRelationPrompt } from './trusted.js';
+import { getFamiliarRelationPrompt } from './familiar';
+import { getIntimateRelationPrompt } from './intimate';
+import { getOwnerRelationPrompt } from './owner';
+import { getStrangerRelationPrompt } from './stranger';
+import { getTrustedRelationPrompt } from './trusted';
 
 /**
  * 根据关系角色和阶段，选择当前应注入的关系层 Prompt。

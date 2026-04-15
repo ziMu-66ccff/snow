@@ -4,10 +4,13 @@
   "description": "Snow — AI 情感陪伴助手",
   "packageManager": "pnpm@9.15.0",
   "engines": {
-    "node": ">=20.0.0",
+    "node": ">=24.0.0",
     "pnpm": ">=9.0.0"
   },
   "scripts": {
+    "dev:web": "pnpm --filter @snow/web dev",
+    "build:web": "pnpm --filter @snow/web build",
+    "typecheck:web": "pnpm --filter @snow/web typecheck",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx packages/core/scripts/db/seed.ts",
@@ -22,15 +25,16 @@
     "tool:gc": "tsx packages/core/scripts/tools/gc-memories.ts"
   },
   "devDependencies": {
-    "dotenv": "^16.4.0",
-    "drizzle-kit": "^0.31.0",
-    "tsx": "^4.19.0",
-    "typescript": "^5.7.0",
-    "@types/node": "^22.0.0"
+    "@types/node": "^25.6.0",
+    "dotenv": "^17.4.2",
+    "drizzle-kit": "^0.31.10",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
-      "esbuild"
+      "esbuild",
+      "@tailwindcss/oxide"
     ]
   }
 }

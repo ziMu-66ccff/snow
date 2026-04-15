@@ -5,10 +5,10 @@
  * 来源：doc/tech/modules/relation-system.md § 四-六
  */
 import { eq } from 'drizzle-orm';
-import { db } from '../db/client.js';
-import { users, userRelations } from '../db/schema.js';
-import { setCachedUserIdentity, getCachedUserIdentity } from '../db/queries/redis-store.js';
-import { evaluateRelationSignals } from './evaluator.js';
+import { db } from '../db/client';
+import { users, userRelations } from '../db/schema';
+import { setCachedUserIdentity, getCachedUserIdentity } from '../db/queries/redis-store';
+import { evaluateRelationSignals } from './evaluator';
 
 /** 五维权重 */
 const WEIGHTS = {

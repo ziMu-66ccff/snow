@@ -33,12 +33,7 @@ function getOpenRouterProvider() {
   return _openrouter;
 }
 
-/** Euryale 70B via OpenRouter — 主对话模型：陪伴、风格、人设表达 */
-export function getEuryale70B(): LanguageModel {
-  return getOpenRouterProvider().chat('sao10k/l3.3-euryale-70b');
-}
-
-/** DeepSeek Chat — 低成本备用模型 */
+/** DeepSeek V3.2 — 主对话 + 结构化任务模型 */
 export function getDeepSeekChat(): LanguageModel {
   return getDeepSeekProvider()('deepseek-chat');
 }

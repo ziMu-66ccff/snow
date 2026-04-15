@@ -6,8 +6,8 @@
  */
 import { generateText, Output } from 'ai';
 import { z } from 'zod';
-import { getDeepSeekChat } from '../ai/models.js';
-import { buildRelationEvaluationPrompt } from '../prompts/relation-evaluation.js';
+import { getDeepSeekChat } from '../ai/models';
+import { buildRelationEvaluationPrompt } from '../prompts/relation-evaluation';
 
 /** LLM 分析的 4 维信号增量（-1 到 1） */
 const relationSignalsSchema = z.object({

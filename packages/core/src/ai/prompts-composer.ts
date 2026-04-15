@@ -4,10 +4,10 @@
  * 组装最终 System Prompt：基础人设 + 关系层 + 外部注入的自定义层 + 情绪层 + 记忆层
  * 所有 prompt 模板从 src/prompts/ 导入
  */
-import { getBasePersonaPrompt } from '../prompts/base-persona.js';
-import { getExampleDialoguesPrompt } from '../prompts/example-dialogues.js';
-import { getRelationLayerPrompt } from '../prompts/relation-layers.js';
-import { buildEmotionLayerPrompt } from '../prompts/emotion-guidance.js';
+import { getBasePersonaPrompt } from '../prompts/base-persona';
+import { getExampleDialoguesPrompt } from '../prompts/example-dialogues';
+import { getRelationLayerPrompt } from '../prompts/relation-layers';
+import { buildEmotionLayerPrompt } from '../prompts/emotion-guidance';
 
 /**
  * Prompt 编排引擎上下文

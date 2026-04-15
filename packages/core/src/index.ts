@@ -1,13 +1,16 @@
 // DB
-export * from './db/schema.js';
-export { db, client } from './db/client.js';
-export { redis } from './db/redis.js';
+export * from './db/schema';
+export { db, client } from './db/client';
+export { redis } from './db/redis';
+
+// Drizzle operators（供外部包查询用，避免直接依赖 drizzle-orm）
+export { eq, and, or, desc, asc, sql, inArray } from 'drizzle-orm';
 
 // AI — Models
-export { getEuryale70B, getDeepSeekChat, getDeepSeekReasoner, getEmbeddingModel } from './ai/models.js';
+export { getDeepSeekChat, getDeepSeekReasoner, getEmbeddingModel } from './ai/models';
 
 // AI — Prompt
-export { composeSystemPrompt, type PromptComposerContext } from './ai/prompts-composer.js';
+export { composeSystemPrompt, type PromptComposerContext } from './ai/prompts-composer';
 
 // AI — Message Utils（统一处理 ModelMessage 多类型 content）
 export {
@@ -16,26 +19,32 @@ export {
   formatMessages,
   isConversationMessage,
   isProtectedMessage,
-} from './ai/message-utils.js';
+} from './ai/message-utils';
 
 // AI — Chat（外界只需要这一个函数 + CLI 善后函数）
-export { getChatResponse, finalizeSession, type ChatInput } from './ai/chat.js';
+export { getChatResponse, finalizeSession, type ChatInput } from './ai/chat';
 
 // Memory（内部使用，但也导出供测试和高级用途）
-export { extractMemories, type MemoryExtraction } from './memory/extractor.js';
-export { writeMemories, type WriteMemoriesInput, type WriteMemoriesResult } from './memory/writer.js';
-export { retrieveMemories, type RetrievedMemories } from './memory/retriever.js';
-export { memoryVividness } from './memory/vividness.js';
-export { generateConversationSummary } from './memory/summarizer.js';
-export { runMemoryExtraction } from './memory/extract.js';
+export { extractMemories, type MemoryExtraction } from './memory/extractor';
+export { writeMemories, type WriteMemoriesInput, type WriteMemoriesResult } from './memory/writer';
+export { retrieveMemories, type RetrievedMemories } from './memory/retriever';
+export { memoryVividness } from './memory/vividness';
+export { generateConversationSummary } from './memory/summarizer';
+export { runMemoryExtraction } from './memory/extract';
 
 // Scheduler
-export { executePeriodicTasks, executeIdleTasks } from './scheduler/task-scheduler.js';
+export { executePeriodicTasks, executeIdleTasks } from './scheduler/task-scheduler';
+export {
+  scheduleDelayedTask,
+  cancelDelayedTask,
+  handleDelayedTaskCallback,
+  type IdleTaskPayload,
+} from './scheduler/delayed-task';
 
 // Relation
-export { evaluateRelationSignals } from './relation/evaluator.js';
-export { updateRelation } from './relation/updater.js';
-export { gcUserMemories, gcAllMemories } from './memory/gc.js';
+export { evaluateRelationSignals } from './relation/evaluator';
+export { updateRelation } from './relation/updater';
+export { gcUserMemories, gcAllMemories } from './memory/gc';
 
 // Emotion
 export {
@@ -45,4 +54,4 @@ export {
   refreshEmotionTrendSummary,
   type EmotionType,
   type EmotionState,
-} from './emotion/engine.js';
+} from './emotion/engine';

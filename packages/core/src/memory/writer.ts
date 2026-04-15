@@ -1,11 +1,11 @@
 import { embed } from 'ai';
-import { getEmbeddingModel } from '../ai/models.js';
-import { extractMemories, type MemoryExtraction } from './extractor.js';
+import { getEmbeddingModel } from '../ai/models';
+import { extractMemories, type MemoryExtraction } from './extractor';
 import {
   upsertFactualMemory,
   insertSemanticMemory,
   getFactualMemoriesForUser,
-} from '../db/queries/memory-write.js';
+} from '../db/queries/memory-write';
 
 export interface WriteMemoriesInput {
   userId: string;

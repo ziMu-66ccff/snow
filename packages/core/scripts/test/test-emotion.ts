@@ -78,9 +78,9 @@ async function test() {
     console.log(`owner 事件类型：${ownerEmotion.analysis.eventType}`);
     console.log(`owner 情绪：${ownerEmotion.state.primary} (${ownerEmotion.state.intensity.toFixed(2)})`);
   } finally {
-    cancelDelayedTask(testUser.platform, testUser.platformId);
+    await cancelDelayedTask(testUser.platform, testUser.platformId);
     await cleanupTestUser(testUser.user.id, testUser.platform, testUser.platformId);
-    cancelDelayedTask(ownerUser.platform, ownerUser.platformId);
+    await cancelDelayedTask(ownerUser.platform, ownerUser.platformId);
     await cleanupTestUser(ownerUser.user.id, ownerUser.platform, ownerUser.platformId);
   }
 

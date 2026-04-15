@@ -9,17 +9,22 @@
  * - snow:memory:*  — 记忆提取相关
  * - snow:chat:*    — 滑动窗口相关
  * - snow:emotion:* — 情绪状态与趋势
+ * - snow:scheduler:* — 延时任务调度状态
  *
  * TTL：
  * - 默认：10 小时
  * - emotion：4 小时
  */
-import { redis } from '../redis.js';
+import { redis } from '../redis';
 
 /** 统一 TTL：10 小时（秒） */
 const TTL = 10 * 60 * 60;
 /** 情绪热状态 TTL：4 小时（秒） */
 const EMOTION_TTL = 4 * 60 * 60;
+/** 延时任务状态 TTL：2 小时（秒） */
+const IDLE_TASK_TTL = 2 * 60 * 60;
+/** 延时任务幂等锁 TTL：24 小时（秒） */
+const IDLE_EXECUTION_LOCK_TTL = 24 * 60 * 60;
 
 /** 构造 Redis key 的用户标识部分 */
 function userKey(platform: string, platformId: string): string {
@@ -175,6 +180,62 @@ export async function setCachedEmotionTrend(platform: string, platformId: string
 }
 
 // ============================================
+// 调度：会话结束延时任务
+// ============================================
+
+export interface ScheduledIdleTask {
+  taskId: string;
+  messageId: string;
+  scheduledFor: string;
+}
+
+/**
+ * 获取当前待执行的会话结束任务。
+ *
+ * 同一用户在任意时刻只允许存在一个待执行任务。
+ */
+export async function getScheduledIdleTask(platform: string, platformId: string): Promise<ScheduledIdleTask | null> {
+  const data = await redis.get(`snow:scheduler:idle:${userKey(platform, platformId)}`);
+  if (!data) return null;
+  return typeof data === 'string' ? JSON.parse(data) : data as ScheduledIdleTask;
+}
+
+/**
+ * 记录当前待执行的会话结束任务。
+ *
+ * 这条记录用于：
+ * 1. 新消息到来时取消旧任务；
+ * 2. 回调落地时校验是不是最新任务。
+ */
+export async function setScheduledIdleTask(
+  platform: string,
+  platformId: string,
+  task: ScheduledIdleTask,
+): Promise<void> {
+  await redis.set(`snow:scheduler:idle:${userKey(platform, platformId)}`, JSON.stringify(task), { ex: IDLE_TASK_TTL });
+}
+
+/** 清除当前待执行的会话结束任务。 */
+export async function clearScheduledIdleTask(platform: string, platformId: string): Promise<void> {
+  await redis.del(`snow:scheduler:idle:${userKey(platform, platformId)}`);
+}
+
+/**
+ * 为延时任务执行创建幂等锁。
+ *
+ * 返回 true 代表当前进程拿到了执行权；
+ * 返回 false 代表该任务已经执行过，或正在被其他回调处理。
+ */
+export async function acquireIdleTaskExecutionLock(taskId: string): Promise<boolean> {
+  const result = await redis.set(`snow:scheduler:idle:executed:${taskId}`, '1', {
+    nx: true,
+    ex: IDLE_EXECUTION_LOCK_TTL,
+  });
+
+  return result === 'OK';
+}
+
+// ============================================
 // 清理全部 Redis key（测试用）
 // ============================================
 
@@ -189,6 +250,7 @@ export async function clearAllRedisKeys(platform: string, platformId: string): P
     `snow:chat:summarized_up_to:${uk}`,
     `snow:emotion:state:${uk}`,
     `snow:emotion:trend:${uk}`,
+    `snow:scheduler:idle:${uk}`,
   ];
   for (const key of keys) {
     await redis.del(key);

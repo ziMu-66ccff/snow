@@ -4,9 +4,9 @@
  * 从对话文本中提取记忆并写入 PG，更新 Redis 上下文摘要。
  * 由编排层（task-scheduler）调用，不关心触发时机。
  */
-import { writeMemories } from './writer.js';
-import { generateConversationSummary } from './summarizer.js';
-import { setMemoryContextSummary } from '../db/queries/redis-store.js';
+import { writeMemories } from './writer';
+import { generateConversationSummary } from './summarizer';
+import { setMemoryContextSummary } from '../db/queries/redis-store';
 
 /**
  * 执行一次增量记忆提取

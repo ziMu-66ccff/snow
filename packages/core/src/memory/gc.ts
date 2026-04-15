@@ -7,9 +7,9 @@
  * 建议每周运行一次（M1: 手动脚本，M2: Cron Job）
  */
 import { eq } from 'drizzle-orm';
-import { db } from '../db/client.js';
-import { semanticMemories, userRelations } from '../db/schema.js';
-import { memoryVividness } from './vividness.js';
+import { db } from '../db/client';
+import { semanticMemories, userRelations } from '../db/schema';
+import { memoryVividness } from './vividness';
 
 /** 鲜活度低于此值的记忆会被删除（彻底遗忘） */
 const GC_THRESHOLD = 0.02;

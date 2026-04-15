@@ -81,8 +81,8 @@ async function test() {
 
     // 取消延时任务（防止 30 分钟后又写数据）
     const { cancelDelayedTask } = await import('../../src/scheduler/delayed-task.js');
-    cancelDelayedTask(owner.platform, owner.platformId);
-    cancelDelayedTask(stranger.platform, stranger.platformId);
+    await cancelDelayedTask(owner.platform, owner.platformId);
+    await cancelDelayedTask(stranger.platform, stranger.platformId);
 
     // 清理 PG 数据
     await cleanupTestUser(owner.user.id, owner.platform, owner.platformId);

@@ -11,12 +11,12 @@
 import {
   popAllUnextractedMessages,
   getMemoryContextSummary,
-} from '../db/queries/redis-store.js';
-import { runMemoryExtraction } from '../memory/extract.js';
-import { persistContextSummary } from '../memory/persist-summary.js';
-import { gcUserMemories } from '../memory/gc.js';
-import { updateRelation } from '../relation/updater.js';
-import { persistEmotionSnapshot, refreshEmotionTrendSummary } from '../emotion/engine.js';
+} from '../db/queries/redis-store';
+import { runMemoryExtraction } from '../memory/extract';
+import { persistContextSummary } from '../memory/persist-summary';
+import { gcUserMemories } from '../memory/gc';
+import { updateRelation } from '../relation/updater';
+import { persistEmotionSnapshot, refreshEmotionTrendSummary } from '../emotion/engine';
 
 /** 用户标识：PG 查询需要 userId，Redis 查询需要 platform + platformId */
 export interface UserIdentifier {

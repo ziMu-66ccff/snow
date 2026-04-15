@@ -1,7 +1,7 @@
 import { generateText, Output } from 'ai';
 import { z } from 'zod';
-import { getDeepSeekChat } from '../ai/models.js';
-import { buildMemoryExtractionPrompt } from '../prompts/memory-extraction.js';
+import { getDeepSeekChat } from '../ai/models';
+import { buildMemoryExtractionPrompt } from '../prompts/memory-extraction';
 
 /**
  * 记忆提取结果 Schema

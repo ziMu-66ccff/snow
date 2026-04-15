@@ -1,6 +1,7 @@
 import { generateText, Output } from 'ai';
 import { z } from 'zod';
-import { getDeepSeekChat } from '../ai/models.js';
+import { getDeepSeekChat } from '../ai/models';
+import { createTimer } from '../utils/perf';
 import {
   getCachedEmotionState,
   setCachedEmotionState,
@@ -8,16 +9,16 @@ import {
   setCachedEmotionTrend,
   getMemoryContextSummary,
   peekUnextractedMessages,
-} from '../db/queries/redis-store.js';
+} from '../db/queries/redis-store';
 import {
   getLatestEmotionSnapshot,
   getRecentEmotionSnapshots,
   insertEmotionSnapshot,
   getEmotionTrendSummary,
   upsertEmotionTrendSummary,
-} from '../db/queries/emotion.js';
-import { buildEmotionEvaluationPrompt } from '../prompts/emotion-evaluation.js';
-import { buildEmotionTrendSummaryPrompt } from '../prompts/emotion-trend-summary.js';
+} from '../db/queries/emotion';
+import { buildEmotionEvaluationPrompt } from '../prompts/emotion-evaluation';
+import { buildEmotionTrendSummaryPrompt } from '../prompts/emotion-trend-summary';
 
 /** Redis 热情绪的有效窗口（小时） */
 const EMOTION_TTL_HOURS = 4;
@@ -58,10 +59,6 @@ const emotionAnalysisSchema = z.object({
   targetEmotion: emotionTypeSchema,
   targetIntensity: z.number().min(0).max(1),
   shockScore: z.number().min(0).max(1),
-  trustAssumption: z.enum(['default_owner_trust', 'normal']),
-  heatLevel: z.number().min(0).max(1),
-  dominanceTone: z.number().min(0).max(1),
-  ownerIntentConfidence: z.number().min(0).max(1),
   reason: z.string().min(1).max(120),
 });
 
@@ -234,9 +231,9 @@ function isOwnerPositiveEvent(eventType: EmotionAnalysis['eventType']): boolean 
 /**
  * 在 owner 模式下，对 LLM 的结构化结果做规则纠偏。
  *
- * 这里不再读取原始消息，也不做关键词猜测，只依据结构化字段判断：
- * - owner 默认高信任
- * - owner 的 flirt / sexual / dominance 语境不应轻易落到 offense
+ * owner 模式的核心假设：主人不会恶意伤害 Snow。
+ * 因此只有在 shockScore 非常高时才保留 offense，
+ * 其他情况都映射为亲密互动事件。
  *
  * @param analysis - LLM 原始分析结果
  * @param relationRole - 当前关系角色
@@ -248,55 +245,21 @@ function postProcessAnalysis(
 ): EmotionAnalysis {
   if (relationRole !== 'owner') return analysis;
 
-  if (analysis.eventType !== 'offense') {
-    return {
-      ...analysis,
-      trustAssumption: 'default_owner_trust',
-    };
-  }
+  // 非 offense 事件：owner 模式下无需纠偏
+  if (analysis.eventType !== 'offense') return analysis;
 
-  const ownerTrust = analysis.trustAssumption === 'default_owner_trust';
-  const confidentOwnerIntent = analysis.ownerIntentConfidence >= 0.65;
-  const moderateHeat = analysis.heatLevel >= 0.4;
-  const moderateDominance = analysis.dominanceTone >= 0.45;
-  const lowNegativeShock = analysis.shockScore <= 0.55;
+  // offense + 高冲击度：真正的冒犯，保留原始判断
+  if (analysis.shockScore > 0.55) return analysis;
 
-  // owner 模式下，如果结构化结果已经说明这更像亲密意图，
-  // 就不继续保留 offense，而是映射回更合理的 owner 私密事件。
-  if (!(ownerTrust || confidentOwnerIntent || moderateHeat || moderateDominance) || !lowNegativeShock) {
-    return {
-      ...analysis,
-      trustAssumption: 'default_owner_trust',
-    };
-  }
-
-  const intense = analysis.shockScore >= 0.6 || analysis.targetIntensity >= 0.65;
-  const possessive = analysis.dominanceTone >= 0.55;
-
-  if (possessive) {
-    return {
-      eventType: 'owner_possessive',
-      targetEmotion: 'playful',
-      targetIntensity: Math.max(0.68, analysis.targetIntensity),
-      shockScore: Math.min(analysis.shockScore, 0.45),
-      trustAssumption: 'default_owner_trust',
-      heatLevel: Math.max(analysis.heatLevel, 0.7),
-      dominanceTone: Math.max(analysis.dominanceTone, 0.65),
-      ownerIntentConfidence: Math.max(analysis.ownerIntentConfidence, 0.85),
-      reason: '主人模式下识别为带支配感的私密调情，不按冒犯处理',
-    };
-  }
+  // offense + 低冲击度：大概率是 LLM 误判了亲密互动，纠偏为 owner 私密事件
+  const intense = analysis.shockScore >= 0.4 || analysis.targetIntensity >= 0.65;
 
   return {
     eventType: intense ? 'sexual_owner_intense' : 'sexual_owner_soft',
     targetEmotion: intense ? 'happy' : 'playful',
     targetIntensity: Math.max(intense ? 0.74 : 0.62, analysis.targetIntensity),
     shockScore: Math.min(analysis.shockScore, 0.4),
-    trustAssumption: 'default_owner_trust',
-    heatLevel: Math.max(analysis.heatLevel, intense ? 0.8 : 0.62),
-    dominanceTone: analysis.dominanceTone,
-    ownerIntentConfidence: Math.max(analysis.ownerIntentConfidence, 0.85),
-    reason: '主人模式下识别为私密升温，不按冒犯处理',
+    reason: '主人模式下低冲击 offense 纠偏为亲密互动',
   };
 }
 
@@ -534,7 +497,11 @@ export async function updateEmotionState(params: {
   relationStage?: string;
   currentMessage: string;
 }) {
+  const tCtx = createTimer('  情绪>上下文读取');
   const context = await getEmotionContext(params);
+  tCtx.end();
+
+  const tAnalyze = createTimer('  情绪>LLM分析(DeepSeek)');
   const analysis = await analyzeEmotion({
     currentState: context.state,
     currentMessage: params.currentMessage,
@@ -544,6 +511,7 @@ export async function updateEmotionState(params: {
     relationRole: params.relationRole,
     relationStage: params.relationStage,
   });
+  tAnalyze.end();
 
   const nextState = mergeEmotionState(context.state, analysis);
 
